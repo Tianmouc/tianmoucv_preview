@@ -1,19 +1,12 @@
-# TianMouCV
 
-The algorithms library for complementary vision sensor Tianmouc.
+# TianMouCV-preview version
 
-More details of the project can be found in [doc](http://www.tianmouc.cn:38325)
+**The official version will be available at [tianmoucv/tianmocv](https://github.com/Tianmouc/tianmoucv) **
 
+The python tool for complementary vision sensor Tianmouc.
 
-## Prepare
+More details of the project can be found in our main page [doc](http://www.tianmouc.cn:38325)
 
-if you want to use this lib to call tianmouc sensor v1 directly, please install tianomuc_sdk-usb version first
-
-```bash
-git clone https://git.tsinghua.edu.cn/wangtaoy20/tianmouc_sdk.git
-cd tianmouc_sdk/usb/install/cyusb_linux_1.0.5
-sh install
-```
 
 ## Installation
 
@@ -40,15 +33,13 @@ Including:
 
 (1) calculating optical flow
 
-(2) reconstruct gray/rgb/hdr images
+(2) reconstruct gray/hdr images
 
 (3) key point matching/tracking
 
 (4) camera calibration
 
-(5) camera sdk api call
-
-(6) data reeader test
+(5) data reeader
 
 ...
 
@@ -58,13 +49,5 @@ These sample can be directly run on jupyter notebook
 conda activate [your envirobnment]
 pip install jupyter notebook
 jupyter notebook
-```
-
-We also provide a example multi-thread realtime processing program template in tianmoucv/camera/open_camera.py
-
-you can directly run it if all the prerequesite are installed
-
-```bash
-python tianmoucv/camera/open_camera.py
 ```
 
