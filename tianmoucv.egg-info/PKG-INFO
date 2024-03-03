@@ -1,0 +1,78 @@
+Metadata-Version: 2.1
+Name: tianmoucv
+Version: 0.1
+Summary: Algorithms library for Tianmouc sensor
+Home-page: https://github.com/Tianmouc/tianmoucv
+Author: Yihan Lin,Taoyi Wang
+Author-email: 532109881@qq.com
+Keywords: tianmoucv
+Classifier: Programming Language :: Python :: 3 :: Only
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Classifier: Intended Audience :: Developers
+Requires-Python: >=3.8
+Requires-Dist: matplotlib>=3.2.2
+Requires-Dist: numpy>=1.18.5
+Requires-Dist: opencv-python>=4.1.1
+Requires-Dist: scipy>=1.4.1
+Requires-Dist: tqdm>=4.64.0
+Requires-Dist: tensorboard>=2.4.1
+Requires-Dist: pandas>=1.1.4
+Requires-Dist: seaborn>=0.11.0
+Requires-Dist: pybind11
+Requires-Dist: ipython
+Requires-Dist: thop>=0.1.1
+
+
+# TianMouCV-preview version
+
+**The official version will be available at [tianmoucv/tianmocv](https://github.com/Tianmouc/tianmoucv)**
+
+The python tool for complementary vision sensor Tianmouc.
+
+More details of the project can be found in our main page [doc](http://www.tianmouc.cn:38325)
+
+
+## Installation
+
+(1) from PyPI
+
+```bash
+pip install tianmoucv
+```
+
+(2) Install from source codes (using pip):
+
+```bash
+#git clone https://github.com/Tianmouc/tianmoucv.git
+git clone git@github.com:Tianmouc/tianmoucv.git
+cd tianmoucv
+sh install.sh
+```
+
+## Usage
+
+For some of the fuction we've provided the example in tianmoucv/exmaple
+
+Including:
+
+(1) calculating optical flow
+
+(2) reconstruct gray/hdr images
+
+(3) key point matching/tracking
+
+(4) camera calibration
+
+(5) data reeader
+
+...
+
+These sample can be directly run on jupyter notebook
+
+```bash
+conda activate [your envirobnment]
+pip install jupyter notebook
+jupyter notebook
+```
+
