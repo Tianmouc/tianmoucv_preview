@@ -1,7 +1,7 @@
 
 # TianMouCV-preview version
 
-**The official version will be available at [tianmoucv/tianmocv](https://github.com/Tianmouc/tianmoucv) **
+**The official version will be available at [tianmoucv/tianmocv](https://github.com/Tianmouc/tianmoucv)**
 
 The python tool for complementary vision sensor Tianmouc.
 
