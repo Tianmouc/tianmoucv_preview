@@ -10,13 +10,15 @@ More details of the project can be found in our main page [doc](http://www.tianm
 
 ## Installation
 
-(1) from PyPI
+(1) from PyPI(not ready)
 
 ```bash
 pip install tianmoucv
 ```
 
 (2) Install from source codes (using pip):
+
+**python version should be large than 3.8**
 
 ```bash
 git clone git@github.com:Tianmouc/Tianmoucv_preview.git
