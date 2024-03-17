@@ -80,20 +80,26 @@ class Reconstrutor_NN(nn.Module):
         super(Reconstrutor_NN, self).__init__()
         current_dir=os.path.dirname(__file__)
         if ckpt_path is None:
-            print('use shared weight:','https://drive.google.com/file/d/1eWF5mW7ccSjUY93gM7bGxgwGl5z1IdlM/view?usp=share_link')
+            #print('use shared weight:','https://drive.google.com/file/d/1eWF5mW7ccSjUY93gM7bGxgwGl5z1IdlM/view?usp=share_link')
             ckpt_path = os.path.join(current_dir,'weight/direct_0109_with_HDR_GTver_best.ckpt')
-        self.reconNet =  UNetRecon(6, 3)
-        dict_re = torch.load(ckpt_path, map_location=torch.device('cpu'))['state_dict_ReconModel']
-        dict_reconNet = dict([])
-        for key in dict_re:
-            new_key_list = key.split('.')[1:]
-            new_key = ''
-            for e in new_key_list:
-                new_key += e + '.'
-            new_key = new_key[:-1]
-            if 'reconNet' in key:
-                dict_reconNet[new_key] = dict_re[key]
-        self.reconNet.load_state_dict(dict_reconNet,strict=True)
+        self.reconNet =  UNetRecon(7, 3)
+        try:
+            dict_re = torch.load(ckpt_path, map_location=torch.device('cpu'))['state_dict_ReconModel']
+            dict_reconNet = dict([])
+            for key in dict_re:
+                new_key_list = key.split('.')[1:]
+                new_key = ''
+                for e in new_key_list:
+                    new_key += e + '.'
+                new_key = new_key[:-1]
+                if 'reconNet' in key:
+                    dict_reconNet[new_key] = dict_re[key]
+            self.reconNet.load_state_dict(dict_reconNet,strict=True)
+            self.easyrecon = True
+        except:
+            self.easyrecon = False
+            self.reconNet = torch.jit.load(ckpt_path, map_location=torch.device('cpu')) 
+
         self.eval()
         for param in self.reconNet.parameters():
             param.requires_grad = False
@@ -102,6 +108,12 @@ class Reconstrutor_NN(nn.Module):
             print('compiling model for pytorch version>= 2.0.0')
             self.reconNet = torch.compile(self.reconNet)
             print('compiled!')
+
+    def __call__(self, F0, tsdiff, t):
+        if self.easyrecon:
+            return self.forward_batch(F0,tsdiff).float()
+        else:
+            return self.complex_forward_batch(F0,tsdiff).float()
 
     @torch.no_grad() 
     def forward_single_t(self, F0, tsdiff, t):
@@ -153,13 +165,26 @@ class Reconstrutor_NN(nn.Module):
             tsdiff = F.interpolate(tsdiff, size=(h,w), mode='bilinear')
 
         F0 = F0.unsqueeze(0).to(self.device)
-        tsdiff = tsdiff.unsqueeze(0).to(self.device)
+        tsdiff = tsdiff.unsqueeze(0).to(self.device)#[b,c,n,w,h]
             
         FO_b = torch.stack([F0[0,...]]*n2,dim=0)
         SD1_b = tsdiff[0,1:,:,...].permute(1,0,2,3)
-        TD_0_t_b = torch.zeros([n2,1,h,w]).to(self.device)
+        #TD_0_t_b = torch.zeros([n2,1,h,w]).to(self.device)
+        #for n in range(1,n2):
+        #    TD_0_t_b[n,...] = torch.sum(tsdiff[:,0:1,1:n,...],dim=2)
+            
+                
+        TD_0_t_b = torch.zeros([n2,2,h,w]).to(self.device)
         for n in range(1,n2):
-            TD_0_t_b[n,...] = torch.sum(tsdiff[:,0:1,1:n,...],dim=2)
+            td_ = tsdiff[:,0:1,1:n+1,...]
+            td_pos = td_.clone()
+            td_pos[td_pos<0] = 0
+            td_pos = torch.sum(td_pos,dim=2)
+            td_neg = td_.clone()
+            td_neg[td_neg>0] = 0
+            td_neg = torch.sum(td_neg,dim=2)
+            td = torch.cat([td_pos,td_neg],dim=1)
+            TD_0_t_b[n:n+1,...] = td
         
         stime = time.time()
         inputTensor = torch.cat([FO_b,TD_0_t_b,SD1_b],dim=1)
