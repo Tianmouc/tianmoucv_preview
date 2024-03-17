@@ -5,6 +5,8 @@ import torch.nn.functional as F
 import os
 import time
 from ..isp import fourdirection2xy,poisson_blend,upsampleTSD
+from .modules import UNetRecon
+
 
 def grayReconstructor(tsdiff,F0,F1,t,TDnoise=0,threshGate=4/255):
     '''
@@ -67,3 +69,102 @@ def grayReconstructor(tsdiff,F0,F1,t,TDnoise=0,threshGate=4/255):
     
     return hdr
 
+
+class Reconstrutor_NN(nn.Module):
+    '''
+    重建网络
+    权重链接:https://drive.google.com/file/d/1eWF5mW7ccSjUY93gM7bGxgwGl5z1IdlM/view?usp=share_link
+    '''
+
+    def __init__(self,ckpt_path = None):
+        super(Reconstrutor_NN, self).__init__()
+        current_dir=os.path.dirname(__file__)
+        if ckpt_path is None:
+            print('use shared weight:','https://drive.google.com/file/d/1eWF5mW7ccSjUY93gM7bGxgwGl5z1IdlM/view?usp=share_link')
+            ckpt_path = os.path.join(current_dir,'weight/direct_0109_with_HDR_GTver_best.ckpt')
+        self.reconNet =  UNetRecon(6, 3)
+        dict_re = torch.load(ckpt_path, map_location=torch.device('cpu'))['state_dict_ReconModel']
+        dict_reconNet = dict([])
+        for key in dict_re:
+            new_key_list = key.split('.')[1:]
+            new_key = ''
+            for e in new_key_list:
+                new_key += e + '.'
+            new_key = new_key[:-1]
+            if 'reconNet' in key:
+                dict_reconNet[new_key] = dict_re[key]
+        self.reconNet.load_state_dict(dict_reconNet,strict=True)
+        self.eval()
+        for param in self.reconNet.parameters():
+            param.requires_grad = False
+        main_version = int(torch.__version__[0])
+        if main_version==2:
+            print('compiling model for pytorch version>= 2.0.0')
+            self.reconNet = torch.compile(self.reconNet)
+            print('compiled!')
+
+    @torch.no_grad() 
+    def forward_single_t(self, F0, tsdiff, t):
+        '''
+          recontruct a frame
+          
+          @tsdiff: [c,n,w,h], -1~1,torch
+          
+          @F0:   [w,h,c],torch
+          
+          @t \in [0,n]
+        '''
+        self.device = self.reconNet.up5.conv2.weight.device
+        
+        F0 = F0.permute(2,0,1)
+        c,h,w = F0.shape
+        c2,n2,h2,w2 = tsdiff.shape
+        if h!=h2:
+            tsdiff = upsampleTSD(tsdiff)
+            tsdiff = F.interpolate(tsdiff, size=(h,w), mode='bilinear')
+            
+        F0 = F0.unsqueeze(0).to(self.device)
+        tsdiff = tsdiff.unsqueeze(0).to(self.device)
+            
+        SD1 = tsdiff[:,1:,t,...]
+        TD_0_t = torch.sum(tsdiff[:,0:1,1:t,...],dim=2)
+        
+        print(TD_0_t.shape,SD1.shape)
+
+        I_1_rec = self.reconNet(torch.cat([F0,TD_0_t,SD1],dim=1))#3+1
+
+        return I_1_rec 
+
+    @torch.no_grad() 
+    def forward_batch(self, F0, tsdiff):
+        '''
+            recontruct a batch
+            
+            @ tsdiff: [c,n,w,h], -1~1,torch
+            
+            @ F0:   [w,h,c],torch
+        '''
+        self.device = self.reconNet.up5.conv2.weight.device
+        F0 = F0.permute(2,0,1)
+        c,h,w = F0.shape
+        c2,n2,h2,w2 = tsdiff.shape
+        if h!=h2:
+            tsdiff = upsampleTSD(tsdiff)   
+            tsdiff = F.interpolate(tsdiff, size=(h,w), mode='bilinear')
+
+        F0 = F0.unsqueeze(0).to(self.device)
+        tsdiff = tsdiff.unsqueeze(0).to(self.device)
+            
+        FO_b = torch.stack([F0[0,...]]*n2,dim=0)
+        SD1_b = tsdiff[0,1:,:,...].permute(1,0,2,3)
+        TD_0_t_b = torch.zeros([n2,1,h,w]).to(self.device)
+        for n in range(1,n2):
+            TD_0_t_b[n,...] = torch.sum(tsdiff[:,0:1,1:n,...],dim=2)
+        
+        stime = time.time()
+        inputTensor = torch.cat([FO_b,TD_0_t_b,SD1_b],dim=1)
+        I_1_rec = self.reconNet(inputTensor)#3+1
+        etime = time.time()
+        frameTime = (etime-stime)/n2
+        print(1/frameTime/n2,'batch`ps',1/frameTime, 'fps')
+        return I_1_rec 
