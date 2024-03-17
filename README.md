@@ -18,11 +18,11 @@ pip install tianmoucv
 
 (2) Install from source codes (using pip):
 
-**python version should be large than 3.8**
+**Python version should be larger than 3.8 and less than 3.12, recommand 3.10**
 
 ```bash
 git clone git@github.com:Tianmouc/Tianmoucv_preview.git
-cd tianmoucv
+cd Tianmoucv_preview
 sh install.sh
 ```
 
