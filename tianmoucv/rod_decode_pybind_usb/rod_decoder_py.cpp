@@ -6,12 +6,14 @@
 #include <fstream>
 #include <cstdlib>
 #include <cstdio>
-#include <filesystem>
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>  // 添加此头文件以支持std::vector和py::list的转换
 //just for test
+#include <filesystem>
 namespace fs = std::filesystem;
+//#include <experimental/filesystem>
+//namespace fs = std::experimental::filesystem;
 
 //#define DUMP
 #define PKT_SIZE_MAX 38400//36800
@@ -22,7 +24,7 @@ namespace fs = std::filesystem;
 /************   Variable definations common **************/
 #define FRM_HEAD_OFFSET 16
 #define FRM_HEAD_CNT_TS_OFFSET 4
-const uint frm_head_cnt_ts_offset = FRM_HEAD_CNT_TS_OFFSET;
+const unsigned int frm_head_cnt_ts_offset = FRM_HEAD_CNT_TS_OFFSET;
 #define FRM_HEAD_ADC_PREC_OFFSET 0
 #define FRM_HEAD_FrmCount_OFFSET 3
 #define FRM_HEAD_TimeStampMSB_OFFSET 1
@@ -52,7 +54,7 @@ void usb_header_parse(int *pvalue, uint64_t * timestamp, int* fcnt, int* radc_pr
     uint32_t cnt_h = static_cast<uint32_t> (pvalue[4] & 0xffffff);
     uint32_t cnt_l = static_cast<uint32_t> (pvalue[5] & 0xffffff);
     *fcnt = static_cast<uint32_t> (cnt_h << 24) + cnt_l;
-    uint adc_bit_prec = (uint)pvalue[0] & 0xf;
+    unsigned int adc_bit_prec = (unsigned int)pvalue[0] & 0xf;
     *radc_prec = adc_bit_prec;
 
     return;
@@ -77,15 +79,15 @@ void usb_header_parse(int *pvalue, uint64_t * timestamp, int* fcnt, int* radc_pr
 int rod_decoder(int *pvalue, int8_t* temp_diff, int8_t* spat_diff_left, int8_t* spat_diff_right, int height, int width){
     
     //adc_bit_prec in frame head
-    uint adc_bit_prec = (uint)pvalue[FRM_HEAD_ADC_PREC_OFFSET] & 0xf;
-    //uint64_t timestamp_high =  (uint)pvalue[FRM_HEAD_TimeStampMSB_OFFSET];
-    //uint64_t timestamp_low = (uint)pvalue[FRM_HEAD_TimeStampLSB_OFFSET];
+    unsigned int adc_bit_prec = (unsigned int)pvalue[FRM_HEAD_ADC_PREC_OFFSET] & 0xf;
+    //uint64_t timestamp_high =  (unsigned int)pvalue[FRM_HEAD_TimeStampMSB_OFFSET];
+    //uint64_t timestamp_low = (unsigned int)pvalue[FRM_HEAD_TimeStampLSB_OFFSET];
     //uint64_t timestamp = ((uint64_t)timestamp_high << 32) + (uint64_t)timestamp_low;
      // set the total pixel number in one group packet
     uint8_t pix_per_grp = 0;
     // set the data mask
     uint16_t d_mask = 0;
-    //uint pkt_max_num;
+    //unsigned int pkt_max_num;
     if(adc_bit_prec == 8){
         pix_per_grp = 2;
         d_mask = 0xff;
@@ -114,7 +116,7 @@ int rod_decoder(int *pvalue, int8_t* temp_diff, int8_t* spat_diff_left, int8_t* 
     int packet_tot_size = 0;
    // for(int ii = 0; ii < pkt_max_num; ii++){
     while(true){
-        uint pkt = (uint)pvalue[index];//read a packt date from pvalue
+        unsigned int pkt = (unsigned int)pvalue[index];//read a packt date from pvalue
         packet_tot_size++;
         //Detect the end of current frame
         if((pkt == 0xffffffff) || (pkt == 0x0))
@@ -124,7 +126,7 @@ int rod_decoder(int *pvalue, int8_t* temp_diff, int8_t* spat_diff_left, int8_t* 
             pkt = pkt >> 8;
             //bool g_pkt_flag = ;
             if (pkt >> 19 == 0x1){
-                uint frm_cnt = pkt & 0x1ff;
+                unsigned int frm_cnt = pkt & 0x1ff;
                 //printf("FRM %u read from DMA\n", frm_cnt);
             }
             else {
@@ -141,7 +143,7 @@ int rod_decoder(int *pvalue, int8_t* temp_diff, int8_t* spat_diff_left, int8_t* 
                     uint16_t yaddr = width * row_addr;
                     for(int gi = 0; gi < eff_grp_num; gi++){
                         index++;
-                        uint grp_pkt = (uint)pvalue[index];
+                        unsigned int grp_pkt = (unsigned int)pvalue[index];
                         packet_tot_size++;
                         //if((grp_pkt == 0xffffffff) ||  (grp_pkt == 0x0))
                         //    printf("Wrong group packet, now at last packet");
@@ -184,7 +186,7 @@ int rod_decoder(int *pvalue, int8_t* temp_diff, int8_t* spat_diff_left, int8_t* 
         // adc bit prec == 2, has its own logic
         else if(adc_bit_prec == 2){
             if ( (pkt >> 27 == 0x1) && (pkt >> 31 == 0x0)){
-                uint frm_cnt = (pkt >> 8) & 0x1ff;
+                unsigned int frm_cnt = (pkt >> 8) & 0x1ff;
                 //printf("FRM %u read from DMA\n", frm_cnt);
             } else{
                 pkt = pkt >> 2;
@@ -198,13 +200,13 @@ int rod_decoder(int *pvalue, int8_t* temp_diff, int8_t* spat_diff_left, int8_t* 
                     uint16_t row_addr = (pkt >> 6) & 0xff;
                     for(int gi = 0; gi < eff_grp_num; gi++){
                         index++;
-                        uint grp_pkt = (uint)pvalue[index];
+                        unsigned int grp_pkt = (unsigned int)pvalue[index];
                         packet_tot_size++;
                         grp_pkt = grp_pkt >> 2;
                         if(grp_pkt >> 29){
                             uint16_t g_addr = (grp_pkt >> 24) & 0x1f;
-                            uint g_data = grp_pkt & 0xffffff;
-                            uint pix_per_grp_last = (g_addr == 0xd) ? 4 : pix_per_grp; // last packet(group addr == 13) only have 4 effecitve data
+                            unsigned int g_data = grp_pkt & 0xffffff;
+                            unsigned int pix_per_grp_last = (g_addr == 0xd) ? 4 : pix_per_grp; // last packet(group addr == 13) only have 4 effecitve data
                             for(uint8_t pi = 0; pi < pix_per_grp_last; pi++){
                                 uint16_t pixel_addr = width * row_addr + g_addr * pix_per_grp + pi;
                                 int8_t pix_data = (int8_t) ((g_data >> (adc_bit_prec * (pix_per_grp - 1 - pi))) & d_mask);
@@ -237,17 +239,17 @@ int rod_decoder(int *pvalue, int8_t* temp_diff, int8_t* spat_diff_left, int8_t* 
 int rod_decoder_tdsd_size(int *pvalue, int8_t* temp_diff, int8_t* spat_diff_left, int8_t* spat_diff_right, int* td_size, int* sd_size, int height, int width){
     
     //adc_bit_prec in frame head
-    uint adc_bit_prec = (uint)pvalue[FRM_HEAD_ADC_PREC_OFFSET] & 0xf;
-    uint cnt = (uint)pvalue[FRM_HEAD_FrmCount_OFFSET];
-    uint64_t timestamp_high =  (uint)pvalue[FRM_HEAD_TimeStampMSB_OFFSET];
-    uint64_t timestamp_low = (uint)pvalue[FRM_HEAD_TimeStampLSB_OFFSET];
+    unsigned int adc_bit_prec = (unsigned int)pvalue[FRM_HEAD_ADC_PREC_OFFSET] & 0xf;
+    unsigned int cnt = (unsigned int)pvalue[FRM_HEAD_FrmCount_OFFSET];
+    uint64_t timestamp_high =  (unsigned int)pvalue[FRM_HEAD_TimeStampMSB_OFFSET];
+    uint64_t timestamp_low = (unsigned int)pvalue[FRM_HEAD_TimeStampLSB_OFFSET];
     uint64_t timestamp = ((uint64_t)timestamp_high << 32) + (uint64_t)timestamp_low;
    // printf("In fime cnt %d, Timestamp %d\n", cnt, timestamp);
      // set the total pixel number in one group packet
     uint8_t pix_per_grp = 0;
     // set the data mask
     uint16_t d_mask = 0;
-    //uint pkt_max_num;
+    //unsigned int pkt_max_num;
     if(adc_bit_prec == 8){
         pix_per_grp = 2;
         d_mask = 0xff;
@@ -279,7 +281,7 @@ int rod_decoder_tdsd_size(int *pvalue, int8_t* temp_diff, int8_t* spat_diff_left
     int packet_tot_size = 0;
    // for(int ii = 0; ii < pkt_max_num; ii++){
     while(true){
-        uint pkt = (uint)pvalue[index];//read a packt date from pvalue
+        unsigned int pkt = (unsigned int)pvalue[index];//read a packt date from pvalue
         packet_tot_size++;
         //Detect the end of current frame
         if((pkt == 0xffffffff) || (pkt == 0x0))
@@ -293,7 +295,7 @@ int rod_decoder_tdsd_size(int *pvalue, int8_t* temp_diff, int8_t* spat_diff_left
             pkt = pkt >> 8;
             //bool g_pkt_flag = ;
             if (pkt >> 19 == 0x1){
-                uint frm_cnt = pkt & 0x1ff;
+                unsigned int frm_cnt = pkt & 0x1ff;
                 //printf("FRM %u read from DMA\n", frm_cnt);
             }
             else {
@@ -318,7 +320,7 @@ int rod_decoder_tdsd_size(int *pvalue, int8_t* temp_diff, int8_t* spat_diff_left
                     for(int gi = 0; gi < eff_grp_num; gi++){
                         index++;
                         
-                        uint grp_pkt = (uint)pvalue[index];
+                        unsigned int grp_pkt = (unsigned int)pvalue[index];
 
                         packet_tot_size++;
                         if(row_pkt_head == 0x10){ // TempDiff Row address packet flag
@@ -372,7 +374,7 @@ int rod_decoder_tdsd_size(int *pvalue, int8_t* temp_diff, int8_t* spat_diff_left
         // adc bit prec == 2, has its own logic
         else if(adc_bit_prec == 2){
             if ( (pkt >> 27 == 0x1) && (pkt >> 31 == 0x0)){
-                uint frm_cnt = (pkt >> 8) & 0x1ff;
+                unsigned int frm_cnt = (pkt >> 8) & 0x1ff;
                 //printf("FRM %u read from DMA\n", frm_cnt);
             } else{
                 pkt = pkt >> 2;
@@ -393,7 +395,7 @@ int rod_decoder_tdsd_size(int *pvalue, int8_t* temp_diff, int8_t* spat_diff_left
                     uint16_t row_addr = (pkt >> 6) & 0xff;
                     for(int gi = 0; gi < eff_grp_num; gi++){
                         index++;
-                        uint grp_pkt = (uint)pvalue[index];
+                        unsigned int grp_pkt = (unsigned int)pvalue[index];
                         packet_tot_size++;
                         if(row_pkt_head == 0x10){ // TempDiff Row address packet flag
                             td_pkt_size++;
@@ -405,8 +407,8 @@ int rod_decoder_tdsd_size(int *pvalue, int8_t* temp_diff, int8_t* spat_diff_left
                         grp_pkt = grp_pkt >> 2;
                         if(grp_pkt >> 29){
                             uint16_t g_addr = (grp_pkt >> 24) & 0x1f;
-                            uint g_data = grp_pkt & 0xffffff;
-                            uint pix_per_grp_last = (g_addr == 0xd) ? 4 : pix_per_grp; // last packet(group addr == 13) only have 4 effecitve data
+                            unsigned int g_data = grp_pkt & 0xffffff;
+                            unsigned int pix_per_grp_last = (g_addr == 0xd) ? 4 : pix_per_grp; // last packet(group addr == 13) only have 4 effecitve data
                             for(uint8_t pi = 0; pi < pix_per_grp_last; pi++){
                                 uint16_t pixel_addr = width * row_addr + g_addr * pix_per_grp + pi;
                                 int8_t pix_data = (int8_t) ((g_data >> (adc_bit_prec * (pix_per_grp - 1 - pi))) & d_mask);
@@ -457,16 +459,16 @@ uint64_t rod_decoder_tdsd_size(int *pvalue, int8_t* temp_diff, int8_t* spat_diff
         // *fcnt = static_cast<uint32_t> (cnt_h << 24) + cnt_l;
         usb_header_parse(pvalue, timestamp, fcnt, radc_prec);
     } else{
-        uint64_t timestamp_high =  (uint)pvalue[FRM_HEAD_TimeStampMSB_OFFSET];
-        uint64_t timestamp_low = (uint)pvalue[FRM_HEAD_TimeStampLSB_OFFSET];
+        uint64_t timestamp_high =  (unsigned int)pvalue[FRM_HEAD_TimeStampMSB_OFFSET];
+        uint64_t timestamp_low = (unsigned int)pvalue[FRM_HEAD_TimeStampLSB_OFFSET];
         *timestamp = ((uint64_t)timestamp_high << 32) + (uint64_t)timestamp_low;
         *fcnt = pvalue[FRM_HEAD_FrmCount_OFFSET];
-        uint adc_bit_prec = (uint)pvalue[FRM_HEAD_ADC_PREC_OFFSET] & 0xf;
+        unsigned int adc_bit_prec = (unsigned int)pvalue[FRM_HEAD_ADC_PREC_OFFSET] & 0xf;
         *radc_prec = adc_bit_prec;
     
     }
       //adc_bit_prec in frame head
-    uint adc_bit_prec = *radc_prec;
+    unsigned int adc_bit_prec = *radc_prec;
    
     
    // printf("In fime cnt %d, Timestamp %d\n", cnt, timestamp);
@@ -474,7 +476,7 @@ uint64_t rod_decoder_tdsd_size(int *pvalue, int8_t* temp_diff, int8_t* spat_diff
     uint8_t pix_per_grp = 0;
     // set the data mask
     uint16_t d_mask = 0;
-    //uint pkt_max_num;
+    //unsigned int pkt_max_num;
     if(adc_bit_prec == 8){
         pix_per_grp = 2;
         d_mask = 0xff;
@@ -506,7 +508,7 @@ uint64_t rod_decoder_tdsd_size(int *pvalue, int8_t* temp_diff, int8_t* spat_diff
     int packet_tot_size = 0;
    // for(int ii = 0; ii < pkt_max_num; ii++){
     while(true){
-        uint pkt = (uint)pvalue[index];//read a packt date from pvalue
+        unsigned int pkt = (unsigned int)pvalue[index];//read a packt date from pvalue
         packet_tot_size++;
         //Detect the end of current frame
         if((pkt == 0xffffffff) || (pkt == 0x0))
@@ -520,7 +522,7 @@ uint64_t rod_decoder_tdsd_size(int *pvalue, int8_t* temp_diff, int8_t* spat_diff
             pkt = pkt >> 8;
             //bool g_pkt_flag = ;
             if (pkt >> 19 == 0x1){
-                uint frm_cnt = pkt & 0x1ff;
+                unsigned int frm_cnt = pkt & 0x1ff;
                 //printf("FRM %u read from DMA\n", frm_cnt);
             }
             else {
@@ -545,7 +547,7 @@ uint64_t rod_decoder_tdsd_size(int *pvalue, int8_t* temp_diff, int8_t* spat_diff
                     for(int gi = 0; gi < eff_grp_num; gi++){
                         index++;
                         
-                        uint grp_pkt = (uint)pvalue[index];
+                        unsigned int grp_pkt = (unsigned int)pvalue[index];
 
                         packet_tot_size++;
                         if(row_pkt_head == 0x10){ // TempDiff Row address packet flag
@@ -599,7 +601,7 @@ uint64_t rod_decoder_tdsd_size(int *pvalue, int8_t* temp_diff, int8_t* spat_diff
         // adc bit prec == 2, has its own logic
         else if(adc_bit_prec == 2){
             if ( (pkt >> 27 == 0x1) && (pkt >> 31 == 0x0)){
-                uint frm_cnt = (pkt >> 8) & 0x1ff;
+                unsigned int frm_cnt = (pkt >> 8) & 0x1ff;
                 //printf("FRM %u read from DMA\n", frm_cnt);
             } else{
                 pkt = pkt >> 2;
@@ -620,7 +622,7 @@ uint64_t rod_decoder_tdsd_size(int *pvalue, int8_t* temp_diff, int8_t* spat_diff
                     uint16_t row_addr = (pkt >> 6) & 0xff;
                     for(int gi = 0; gi < eff_grp_num; gi++){
                         index++;
-                        uint grp_pkt = (uint)pvalue[index];
+                        unsigned int grp_pkt = (unsigned int)pvalue[index];
                         packet_tot_size++;
                         if(row_pkt_head == 0x10){ // TempDiff Row address packet flag
                             td_pkt_size++;
@@ -632,8 +634,8 @@ uint64_t rod_decoder_tdsd_size(int *pvalue, int8_t* temp_diff, int8_t* spat_diff
                         grp_pkt = grp_pkt >> 2;
                         if(grp_pkt >> 29){
                             uint16_t g_addr = (grp_pkt >> 24) & 0x1f;
-                            uint g_data = grp_pkt & 0xffffff;
-                            uint pix_per_grp_last = (g_addr == 0xd) ? 4 : pix_per_grp; // last packet(group addr == 13) only have 4 effecitve data
+                            unsigned int g_data = grp_pkt & 0xffffff;
+                            unsigned int pix_per_grp_last = (g_addr == 0xd) ? 4 : pix_per_grp; // last packet(group addr == 13) only have 4 effecitve data
                             for(uint8_t pi = 0; pi < pix_per_grp_last; pi++){
                                 uint16_t pixel_addr = width * row_addr + g_addr * pix_per_grp + pi;
                                 int8_t pix_data = (int8_t) ((g_data >> (adc_bit_prec * (pix_per_grp - 1 - pi))) & d_mask);
@@ -670,14 +672,14 @@ uint64_t rod_decoder_tdsd_size(int *pvalue, int8_t* temp_diff, int8_t* spat_diff
 
 int cone_reader(int *pvalue, int16_t* raw, int height, int width){
     //timestamp for sync CONE and ROD
-    //uint64_t timestamp_high =  (uint)pvalue[CONE_FRM_HEAD_TimeStampMSB_OFFSET];
-    //uint64_t timestamp_low = (uint)pvalue[CONE_FRM_HEAD_TimeStampLSB_OFFSET];
+    //uint64_t timestamp_high =  (unsigned int)pvalue[CONE_FRM_HEAD_TimeStampMSB_OFFSET];
+    //uint64_t timestamp_low = (unsigned int)pvalue[CONE_FRM_HEAD_TimeStampLSB_OFFSET];
    // uint64_t timestamp = (timestamp_high << 32) + timestamp_low;
 
     int index = 16;
     for(int ii = 0; ii < height * width; ii++){
-        int16_t pix = (int16_t) ((uint)pvalue[index] & 0x3ff);
-        //uint pixel_addr = width * row_addr + g_addr * pix_per_grp + pi;
+        int16_t pix = (int16_t) ((unsigned int)pvalue[index] & 0x3ff);
+        //unsigned int pixel_addr = width * row_addr + g_addr * pix_per_grp + pi;
         raw[ii] = pix;
         index++;
     }
@@ -685,16 +687,16 @@ int cone_reader(int *pvalue, int16_t* raw, int height, int width){
 }
 int cone_reader(int *pvalue, int16_t* raw, int height, int width, uint64_t* timestamp, int* fcnt){
     //timestamp for sync CONE and ROD
-    uint64_t timestamp_high =  (uint)pvalue[CONE_FRM_HEAD_TimeStampMSB_OFFSET];
-    uint64_t timestamp_low = (uint)pvalue[CONE_FRM_HEAD_TimeStampLSB_OFFSET];
+    uint64_t timestamp_high =  (unsigned int)pvalue[CONE_FRM_HEAD_TimeStampMSB_OFFSET];
+    uint64_t timestamp_low = (unsigned int)pvalue[CONE_FRM_HEAD_TimeStampLSB_OFFSET];
     *timestamp = ((uint64_t)timestamp_high << 32) + (uint64_t)timestamp_low;
     
     *fcnt = pvalue[CONE_FRM_HEAD_FrmCount_OFFSET];
     
     int index = 16;
     for(int ii = 0; ii < height * width; ii++){
-        int16_t pix = (int16_t) ((uint)pvalue[index] & 0x3ff);
-        //uint pixel_addr = width * row_addr + g_addr * pix_per_grp + pi;
+        int16_t pix = (int16_t) ((unsigned int)pvalue[index] & 0x3ff);
+        //unsigned int pixel_addr = width * row_addr + g_addr * pix_per_grp + pi;
         raw[ii] = pix;
         index++;
     }
@@ -720,7 +722,7 @@ int cone_reader_usb_info(int *pvalue, int16_t* raw, int height, int width, uint6
         int16_t pix = two_pix & 0x3ff;
         int16_t pix2 = (two_pix >> 10) & 0x3ff;
 
-        //uint pixel_addr = width * row_addr + g_addr * pix_per_grp + pi;
+        //unsigned int pixel_addr = width * row_addr + g_addr * pix_per_grp + pi;
         raw[2 * i] = pix;
         raw[2 * i + 1] = pix2;
     }
@@ -912,8 +914,8 @@ int rod_compact_pkt(const std::string &fpath, int img_per_file, int size, int on
             int index = 0;
             //int pktptr_this_frm = 0;
             while(true){
-              //  uint pkt = (uint) pval_ptr[index];
-                if((uint) pval_ptr[index] !=  0xffffffff){//end of one frame packet 
+              //  unsigned int pkt = (unsigned int) pval_ptr[index];
+                if((unsigned int) pval_ptr[index] !=  0xffffffff){//end of one frame packet 
                     pkt_buf_ptr[pktptr_this_file] = pvalue[index];
                     pktptr_this_file++;
                     index++;
@@ -1137,8 +1139,8 @@ int rod_decoder_py_onlyinfo(const std::string &fpath, int img_per_file, int size
         int* pval_ptr = pvalue + f_offset * i;
         int radc_prec = pval_ptr[FRM_HEAD_ADC_PREC_OFFSET] & 0xf;
         int rfcnt = pval_ptr[FRM_HEAD_FrmCount_OFFSET];
-        uint64_t timestamp_high =  (uint)pval_ptr[FRM_HEAD_TimeStampMSB_OFFSET];
-        uint64_t timestamp_low = (uint)pval_ptr[FRM_HEAD_TimeStampLSB_OFFSET];
+        uint64_t timestamp_high =  (unsigned int)pval_ptr[FRM_HEAD_TimeStampMSB_OFFSET];
+        uint64_t timestamp_low = (unsigned int)pval_ptr[FRM_HEAD_TimeStampLSB_OFFSET];
         uint64_t rtimestamp = ((uint64_t)timestamp_high << 32) + (uint64_t)timestamp_low;
         uint64_t* ts_val = timestamp_ptr + i;
         *ts_val = rtimestamp;
@@ -1358,8 +1360,8 @@ void rod_header_repack(std::vector<int> &pkt_buf, int pktptr_this_file){
 	pkt_buf[0] = pkt_buf[0] | 0xed800000;
 
 	assert (pkt_buf.size() == pktptr_this_file);
-	uint64_t timestamp_high =  (uint)pkt_buf[FRM_HEAD_TimeStampMSB_OFFSET];
-	uint64_t timestamp_low = (uint)pkt_buf[FRM_HEAD_TimeStampLSB_OFFSET];
+	uint64_t timestamp_high =  (unsigned int)pkt_buf[FRM_HEAD_TimeStampMSB_OFFSET];
+	uint64_t timestamp_low = (unsigned int)pkt_buf[FRM_HEAD_TimeStampLSB_OFFSET];
 	uint64_t timestamp = ((uint64_t)timestamp_high << 32) + (uint64_t)timestamp_low;
 	uint32_t fcnt = pkt_buf[FRM_HEAD_FrmCount_OFFSET];
 	// re packt the timestamp
@@ -1400,8 +1402,8 @@ void cone_header_repack(std::vector<int> &pkt_buf, int pktptr_this_file){
 	// printf("\n");
 	pkt_buf[0] = pkt_buf[0] | 0xfa800000;
 	assert (pkt_buf.size() == pktptr_this_file);
-	uint64_t timestamp_high =  (uint)pkt_buf[FRM_HEAD_TimeStampMSB_OFFSET];
-	uint64_t timestamp_low = (uint)pkt_buf[FRM_HEAD_TimeStampLSB_OFFSET];
+	uint64_t timestamp_high =  (unsigned int)pkt_buf[FRM_HEAD_TimeStampMSB_OFFSET];
+	uint64_t timestamp_low = (unsigned int)pkt_buf[FRM_HEAD_TimeStampLSB_OFFSET];
 	uint64_t timestamp = ((uint64_t)timestamp_high << 32) + (uint64_t)timestamp_low;
 	uint32_t fcnt = pkt_buf[FRM_HEAD_FrmCount_OFFSET];
 // re packt the timestamp
@@ -1500,8 +1502,8 @@ void rod_compact_pcie2usb(const std::string &dataset_top, int img_per_file, int 
 			//int pktptr_this_frm = 0;
 			std::vector<int> pkt_buf;
 			while(true){
-				//  uint pkt = (uint) pval_ptr[index];
-				if((uint) pval_ptr[index] !=  0xffffffff){//end of one frame packet 
+				//  unsigned int pkt = (unsigned int) pval_ptr[index];
+				if((unsigned int) pval_ptr[index] !=  0xffffffff){//end of one frame packet 
 					//pkt_buf_ptr[pktptr_this_file] = pvalue[index];
 					pkt_buf.push_back(pval_ptr[index]);
 					frm_size_this++;
