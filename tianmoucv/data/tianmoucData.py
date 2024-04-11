@@ -10,7 +10,7 @@ try:
 except:
     print("FATAL ERROR: no decoder found, please complie the decoder under ./rod_decoder_py")
 #用于重建
-from tianmoucv.proc.reconstruct import laplacian_blending
+from tianmoucv.isp import laplacian_blending
 from tianmoucv.isp import default_rgb_isp,fourdirection2xy
 from .tianmoucData_basic import TianmoucDataReader_basic
 

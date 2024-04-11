@@ -114,6 +114,22 @@ def white_balance(img,HSB=256):
     #print('wb:',np.max(img))
     return img
 
+# ===============================================================
+# ToneMapping
+# ===============================================================
+def ACESToneMapping(color, adapted_lum=1):
+    '''
+    https://zhuanlan.zhihu.com/p/21983679
+    '''
+    A = 2.51
+    B = 0.03
+    C = 2.43
+    D = 0.59
+    E = 0.14
+    color *= adapted_lum
+    return (color * (A * color + B)) / (color * (C * color + D) + E)
+
+
 
 def adjust_saturation(image, saturation_factor = (48,48,64)):
     '''

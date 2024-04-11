@@ -12,7 +12,7 @@ except:
 
 #用于重建
 #用于rgb的ISP
-from tianmoucv.proc.reconstruct import laplacian_blending
+from tianmoucv.isp import laplacian_blending
 from tianmoucv.isp import default_rgb_isp,fourdirection2xy,ACESToneMapping
 
 from ctypes import *

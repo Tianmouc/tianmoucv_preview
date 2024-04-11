@@ -12,7 +12,7 @@ except:
 
 #用于重建
 #用于rgb的ISP
-from tianmoucv.proc.reconstruct import laplacian_blending
+from tianmoucv.isp import laplacian_blending
 from tianmoucv.isp import default_rgb_isp,fourdirection2xy,ACESToneMapping
 
 from ctypes import *
@@ -21,16 +21,16 @@ flag = True
 
 class TianmoucDataReader_basic():
     '''
-    #    @ path: string或者string的列表，会自动扫描其下所有的tmdat sample
-    #    @ showList:是否打印信息
-    #    @ MAXLEN:每个sample的最大长度，防止超长sample干扰训练
-    #    @ matchkey:是否匹配某个sample name
-    #    @ cachePath:缓存目录，None则每次重新构建数据集
-    #    @ ifcache:是否存下所有数据的地址，方便大规模数据集下次读取
-    #    @ speedUpRate:数据稀疏采样
-    #            *这部分处理不会被存储
-    #    输出数据是F0,F1,...,FN，F0_HDR,F1_HDR,...,FN_HDR，以及25*N*speedUpRate 帧ROD 连续
-    #    存储在一个字典里，上述名称为key
+        - path: string或者string的列表，会自动扫描其下所有的tmdat sample
+        - showList:是否打印信息
+        - MAXLEN:每个sample的最大长度，防止超长sample干扰训练
+        - matchkey:是否匹配某个sample name
+        - cachePath:缓存目录，None则每次重新构建数据集
+        - ifcache:是否存下所有数据的地址，方便大规模数据集下次读取
+        - speedUpRate:数据稀疏采样
+                *这部分处理不会被存储
+        输出数据是F0,F1,...,FN，F0_HDR,F1_HDR,...,FN_HDR，以及25*N*speedUpRate 帧ROD 连续
+        存储在一个字典里，上述名称为key
     '''
     def __init__(self,path,showList=True,
                  MAXLEN=-1,

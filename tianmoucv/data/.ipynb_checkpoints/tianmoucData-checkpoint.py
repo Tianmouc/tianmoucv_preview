@@ -1,33 +1,33 @@
 import numpy as np
-import os
 import cv2,sys
 import torch
 import math,time
 import torch.nn.functional as F
+import os
 flag = True
 try:
     from tianmoucv.rdp_usb import rod_decoder_py as rdc
 except:
     print("FATAL ERROR: no decoder found, please complie the decoder under ./rod_decoder_py")
 #用于重建
-from tianmoucv.proc.reconstruct import laplacian_blending
+from tianmoucv.isp import laplacian_blending
 from tianmoucv.isp import default_rgb_isp,fourdirection2xy
 from .tianmoucData_basic import TianmoucDataReader_basic
 
 class TianmoucDataReader(TianmoucDataReader_basic):
     '''
-    # 继承datareader，一次性读多帧
-    #    @ N:一次性读取N帧COP成为一个片段
-    #    @ path: string或者string的列表，会自动扫描其下所有的tmdat sample
-    #    @ showList:是否打印信息
-    #    @ MAXLEN:每个sample的最大长度，防止超长sample干扰训练
-    #    @ matchkey:是否匹配某个sample name
-    #    @ cachePath:缓存目录，None则每次重新构建数据集
-    #    @ ifcache:是否存下所有数据的地址，方便大规模数据集下次读取
-    #    @ speedUpRate:数据稀疏采样
-    #            *这部分处理不会被存储
-    #    输出数据是F0,F1,...,FN，F0_HDR,F1_HDR,...,FN_HDR，以及25*N*speedUpRate 帧ROD 连续
-    #    存储在一个字典里，上述名称为key
+     继承datareader，一次性读多帧
+        - N:一次性读取N帧COP成为一个片段
+        - path: string或者string的列表，会自动扫描其下所有的tmdat sample
+        - showList:是否打印信息
+        - MAXLEN:每个sample的最大长度，防止超长sample干扰训练
+        - matchkey:是否匹配某个sample name
+        - cachePath:缓存目录，None则每次重新构建数据集
+        - ifcache:是否存下所有数据的地址，方便大规模数据集下次读取
+        - speedUpRate:数据稀疏采样
+                *这部分处理不会被存储
+        输出数据是F0,F1,...,FN，F0_HDR,F1_HDR,...,FN_HDR，以及25*N*speedUpRate 帧ROD 连续
+        存储在一个字典里，上述名称为key
     '''
     def __init__(self,path,
                  N=1,
@@ -109,18 +109,18 @@ class TianmoucDataReader(TianmoucDataReader_basic):
         '''
         use the decoder and isp preprocess to generate a paired (RGB,n*TSD) sample dict:
         
-            sample['tsdiff_160x320'] = RAW TSD data ajusted to coorect space(with hollow)
-            sample['tsdiff'] = TSD data upsample to 320*640
-            sample['F0_without_isp'] = only demosaced frame data, 3*320*640, t=t_0
-            sample['F1_without_isp'] = only demosaced frame data, 3*320*640, t=t_0
-            sample['F0_HDR']: RGB+SD Blended HDR frame data, 3*320*640, t=t_0
-            sample['F1_HDR']: RGB+SD Blended HDR frame data, 3*320*640, t=t_0+33ms
-            sample['F0']: preprocessed frame data, 3*320*640, t=t_0
-            sample['F1']: preprocessed frame data, 3*320*640, t=t_0+33ms
-            sample['rawDiff']: raw TSD data, N*3*160*160, from t=t_0 to t=t+33ms
-            sample['meta']: path infomation and and timestamps for each data
-            sample['labels']: list of labels, if you have one
-            sample['sysTimeStamp']: system time stamp in us, use for multi-sensor sync
+            - sample['tsdiff_160x320'] = RAW TSD data ajusted to coorect space(with hollow)
+            - sample['tsdiff'] = TSD data upsample to 320*640
+            - sample['F0_without_isp'] = only demosaced frame data, 3*320*640, t=t_0
+            - sample['F1_without_isp'] = only demosaced frame data, 3*320*640, t=t_0
+            - sample['F0_HDR']: RGB+SD Blended HDR frame data, 3*320*640, t=t_0
+            - sample['F1_HDR']: RGB+SD Blended HDR frame data, 3*320*640, t=t_0+33ms
+            - sample['F0']: preprocessed frame data, 3*320*640, t=t_0
+            - sample['F1']: preprocessed frame data, 3*320*640, t=t_0+33ms
+            - sample['rawDiff']: raw TSD data, N*3*160*160, from t=t_0 to t=t+33ms
+            - sample['meta']: path infomation and and timestamps for each data
+            - sample['labels']: list of labels, if you have one
+            - sample['sysTimeStamp']: system time stamp in us, use for multi-sensor sync
         '''       
         sample = dict([])
         metaInfo = dict([])
