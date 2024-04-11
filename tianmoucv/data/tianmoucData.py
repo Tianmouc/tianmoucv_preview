@@ -1,5 +1,5 @@
 import numpy as np
-import cv2,sys
+import cv2,sys,subprocess
 import torch
 import math,time
 import torch.nn.functional as F
@@ -8,7 +8,18 @@ flag = True
 try:
     from tianmoucv.rdp_usb import rod_decoder_py as rdc
 except:
-    print("FATAL ERROR: no decoder found, please complie the decoder under ./rod_decoder_py")
+    print("WARNING: no decoder found, try to compile under ./rod_decoder_py")
+    current_file_path = os.path.abspath(__file__)
+    parent_folder_path = os.path.dirname(os.path.dirname(current_file_path))
+    aim_path = os.path.join(parent_folder_path,'rdp_usb')
+    os.chdir(aim_path)
+    current_path = os.getcwd()
+    print("Current Path:", current_path)
+    subprocess.run(['sh', './compile_pybind.sh'])
+    from tianmoucv.rdp_usb import rod_decoder_py as rdc
+    print('compile decoder successfully')
+
+
 #用于重建
 from tianmoucv.isp import laplacian_blending
 from tianmoucv.isp import default_rgb_isp,fourdirection2xy
