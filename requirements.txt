@@ -16,4 +16,3 @@ pybind11
 # Extras --------------------------------------
 ipython  # interactive notebook
 thop>=0.1.1  # FLOPs computation
-

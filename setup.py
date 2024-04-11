@@ -4,18 +4,19 @@ import sys
 import subprocess
 import os
 
-requirements = ["torch"]
-
 with open("./requirements.txt", "r", encoding="utf-8") as fh:
     install_requires = fh.read()
 
 with open("./README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
-if sys.platform == "linux" or sys.platform == "linux2" or sys.platform == "darwin":
-    os.chdir('tianmoucv/rdp_usb')
-    subprocess.run(['sh','compile_pybind.sh'])
-    os.chdir('../..')   
+try:
+    import tianmoucv
+except:
+    if sys.platform == "linux" or sys.platform == "linux2" or sys.platform == "darwin":
+        os.chdir('tianmoucv/rdp_usb')
+        subprocess.run(['sh','compile_pybind.sh'])
+        os.chdir('../..')    
     
 setup(
     name='tianmoucv',                   # 模块的名称
