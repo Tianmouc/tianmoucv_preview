@@ -28,14 +28,16 @@ jobs:
         python-version: '3.x'
     - name: Install dependencies
       run: |
+        pip install wheel
+        pip install --upgrade setuptools
         sudo apt-get update
         sudo apt-get install -y g++
-        sh install.sh
         pip install -r requirements.txt
+        sh install.sh
     - name: Build package
       run:  python setup.py bdist_wheel
     - name: Publish package
       uses: pypa/gh-action-pypi-publish@27b31702a0e7fc50959f5ad993c78deac1bdfc29
       with:
-        user: ordinarabbit
+        user: ordinrabbit
         password: ${{secrets.PYPI_PASSWORD}}
