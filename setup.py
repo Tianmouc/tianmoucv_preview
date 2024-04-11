@@ -17,6 +17,7 @@ setup(
     description='Algorithms library for Tianmouc sensor',   # 简要描述
     url='https://github.com/Tianmouc/tianmoucv',  # 项目主页的URL
     packages=find_packages(),   # 告诉 setuptools 自动找到要安装的包
+    package_data = {'reconstructor.weight':['reconstructor/weight/*.ckpt'],'rdp_usb':['rdp_usb/*.so','rdp_usb/*.pyd']},
     include_package_data=True,
     install_requires=install_requires,
     long_description=long_description,
