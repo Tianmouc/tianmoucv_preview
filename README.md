@@ -21,7 +21,6 @@ pip install tianmoucv
 **Python version should be larger than 3.8 and less than 3.12, recommand 3.10**
 
 ```bash
-
 conda create -n [YOUR ENV NAME] --python=3.10
 conda activate [YOUR ENV NAME]
 conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia
