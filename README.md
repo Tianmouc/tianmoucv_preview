@@ -11,7 +11,7 @@ More details of the project can be found in our main page [doc](http://www.tianm
 
 ## Installation
 
-(1) from PyPI(not ready)
+(1) from PyPI
 
 ```bash
 pip install tianmoucv
