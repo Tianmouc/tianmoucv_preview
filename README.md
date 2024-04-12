@@ -1,4 +1,4 @@
-![PyPI - Version](https://img.shields.io/pypi/v/tianmoucv)
+![PyPI - Version](https://img.shields.io/pypi/v/tianmoucv) ![PyPI - Wheel](https://img.shields.io/pypi/wheel/tianmoucv) ![PyPI - License](https://img.shields.io/pypi/l/tianmoucv) ![PyPI - Downloads](https://img.shields.io/pypi/dm/tianmoucv) 
 
 # TianMouCV-preview version
 
