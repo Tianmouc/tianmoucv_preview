@@ -1,3 +1,4 @@
+![PyPI - Version](https://img.shields.io/pypi/v/tianmoucv)
 
 # TianMouCV-preview version
 
