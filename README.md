@@ -30,7 +30,26 @@ cd Tianmoucv_preview
 sh install.sh
 ```
 
-## Usage
+## Data
+
+You can download a tianmouc data clip in [THU-sharelink](https://cloud.tsinghua.edu.cn/f/dc0d394efcb44af3b9b3/?dl=1), You can refer to tianmoucv/exmaple/data/test_data_read.ipynb for a trial
+
+a standard tianmouc dataset structure:
+
+```
+├── dataset
+│   ├── matchkey
+│   │   ├── cone
+│   │       ├── info.txt
+│   │       ├── xxx.tmdat
+│   │   ├── rod
+│   │       ├── info.txt
+│   │       ├── xxx.tmdat
+```
+
+where matchkey is the sample name used for tianmouc data reader 
+
+## Examples
 
 For some of the fuction we've provided the example in tianmoucv/exmaple
 
