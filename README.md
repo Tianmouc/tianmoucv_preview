@@ -11,6 +11,16 @@ More details of the project can be found in our main page [doc](http://www.tianm
 
 ## Installation
 
+(0) prepare pytorch env
+
+**Python version should be larger than 3.8 and less than 3.12, recommend 3.10**
+
+```bash
+conda create -n [YOUR ENV NAME] --python=3.10
+conda activate [YOUR ENV NAME]
+conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia
+```
+
 (1) from PyPI
 
 ```bash
@@ -19,12 +29,7 @@ pip install tianmoucv
 
 (2) Install from source codes (using pip):
 
-**Python version should be larger than 3.8 and less than 3.12, recommand 3.10**
-
 ```bash
-conda create -n [YOUR ENV NAME] --python=3.10
-conda activate [YOUR ENV NAME]
-conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia
 git clone git@github.com:Tianmouc/Tianmoucv_preview.git
 cd Tianmoucv_preview
 sh install.sh
