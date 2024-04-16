@@ -4,13 +4,13 @@
 
 **The official version will be available at [tianmoucv/tianmocv](https://github.com/Tianmouc/tianmoucv)**
 
-This is the Python tool for the irst complementary vision sensor (CVS), TianMouC.
+This is the Python tool for the first complementary vision sensor (CVS), TianMouC.
 
 More details about the project can be found on our project page. [doc](http://www.tianmouc.cn:38325)
 
 ## Installation
 
-(0) prepare Pytorch environment
+(0) Prepare pytorch environment
 
 **Python version should be larger than 3.8 and less than 3.12, recommend 3.10**
 
