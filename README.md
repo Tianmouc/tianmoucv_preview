@@ -4,14 +4,13 @@
 
 **The official version will be available at [tianmoucv/tianmocv](https://github.com/Tianmouc/tianmoucv)**
 
-The python tool for complementary vision sensor Tianmouc.
+This is the Python tool for the irst complementary vision sensor (CVS), TianMouC.
 
-More details of the project can be found in our main page [doc](http://www.tianmouc.cn:38325)
-
+More details about the project can be found on our project page. [doc](http://www.tianmouc.cn:38325)
 
 ## Installation
 
-(0) prepare pytorch env
+(0) prepare Pytorch environment
 
 **Python version should be larger than 3.8 and less than 3.12, recommend 3.10**
 
@@ -37,9 +36,9 @@ sh install.sh
 
 ## Data
 
-You can download a tianmouc data clip in [THU-sharelink](https://cloud.tsinghua.edu.cn/f/dc0d394efcb44af3b9b3/?dl=1), You can refer to tianmoucv/exmaple/data/test_data_read.ipynb for a trial
+You can download a TianMouC data clip in [THU-sharelink](https://cloud.tsinghua.edu.cn/f/dc0d394efcb44af3b9b3/?dl=1), and refer to tianmoucv/exmaple/data/test_data_read.ipynb for a trial
 
-a standard tianmouc dataset structure:
+a standard TianMouC dataset structure:
 
 ```
 ├── dataset
@@ -52,11 +51,11 @@ a standard tianmouc dataset structure:
 │   │       ├── xxx.tmdat
 ```
 
-where matchkey is the sample name used for tianmouc data reader 
+where matchkey is the sample name used for the TianMouC data reader 
 
 ## Examples
 
-For some of the fuction we've provided the example in tianmoucv/exmaple
+For some of the algorithms we've provided the example in tianmoucv/example
 
 Including:
 
@@ -72,10 +71,10 @@ Including:
 
 ...
 
-These sample can be directly run on jupyter notebook
+These samples can be directly run on jupyter notebook
 
 ```bash
-conda activate [your envirobnment]
+conda activate [your environment]
 pip install jupyter notebook
 jupyter notebook
 ```
