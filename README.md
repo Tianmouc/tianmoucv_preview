@@ -2,6 +2,8 @@
 
 # TianMouCV-preview version
 
+![usbmodule](/resources/usb_module.jpg)
+
 **The official version will be available at [tianmoucv/tianmocv](https://github.com/Tianmouc/tianmoucv)**
 
 This is the Python tool for the first complementary vision sensor (CVS), TianMouC.
