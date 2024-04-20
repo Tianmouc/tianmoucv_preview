@@ -1,6 +1,6 @@
 import numpy as np
 import os
-import cv2,sys,subprocess
+import cv2,sys
 import torch
 import math,time
 import torch.nn.functional as F
@@ -8,6 +8,7 @@ import torch.nn.functional as F
 try:
     from tianmoucv.rdp_usb import rod_decoder_py as rdc
 except:
+    import subprocess
     print("WARNING: no decoder found, try to compile under ./rod_decoder_py")
     current_file_path = os.path.abspath(__file__)
     parent_folder_path = os.path.dirname(os.path.dirname(current_file_path))
@@ -21,7 +22,7 @@ except:
 
 #用于重建
 #用于rgb的ISP
-from tianmoucv.isp import laplacian_blending
+from tianmoucv.proc.reconstruct import laplacian_blending
 from tianmoucv.isp import default_rgb_isp,fourdirection2xy,ACESToneMapping
 
 from ctypes import *
@@ -380,7 +381,7 @@ class TianmoucDataReader_basic():
             sample['tsdiff_160x320'] = RAW TSD data ajusted to coorect space(with hollow)
             sample['tsdiff'] = TSD data upsample to 320*640
             sample['F0_without_isp'] = only demosaced frame data, 3*320*640, t=t_0
-            sample['F1_without_isp'] = only demosaced frame data, 3*320*640, t=t_0
+            sample['F1_without_isp'] = only demosaced frame data, 3*320*640, t=t_0+33ms
             sample['F0_HDR']: RGB+SD Blended HDR frame data, 3*320*640, t=t_0
             sample['F1_HDR']: RGB+SD Blended HDR frame data, 3*320*640, t=t_0+33ms
             sample['F0']: preprocessed frame data, 3*320*640, t=t_0

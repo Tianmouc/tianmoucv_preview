@@ -1,5 +1,5 @@
 import numpy as np
-import cv2,sys,subprocess
+import cv2,sys
 import torch
 import math,time
 import torch.nn.functional as F
@@ -18,27 +18,49 @@ except:
     subprocess.run(['sh', './compile_pybind.sh'])
     from tianmoucv.rdp_usb import rod_decoder_py as rdc
     print('compile decoder successfully')
-
-
+    
 #用于重建
-from tianmoucv.isp import laplacian_blending
+from tianmoucv.proc.reconstruct import laplacian_blending
 from tianmoucv.isp import default_rgb_isp,fourdirection2xy
 from .tianmoucData_basic import TianmoucDataReader_basic
 
 class TianmoucDataReader(TianmoucDataReader_basic):
     '''
-     继承datareader，一次性读多帧
-        - N:一次性读取N帧COP成为一个片段
-        - path: string或者string的列表，会自动扫描其下所有的tmdat sample
-        - showList:是否打印信息
-        - MAXLEN:每个sample的最大长度，防止超长sample干扰训练
-        - matchkey:是否匹配某个sample name
-        - cachePath:缓存目录，None则每次重新构建数据集
-        - ifcache:是否存下所有数据的地址，方便大规模数据集下次读取
-        - speedUpRate:数据稀疏采样
-                *这部分处理不会被存储
-        输出数据是F0,F1,...,FN，F0_HDR,F1_HDR,...,FN_HDR，以及25*N*speedUpRate 帧ROD 连续
-        存储在一个字典里，上述名称为key
+    - **TianmoucDataReader(0.3.3)**
+        - ## [输入]
+        - 输入dataPath：该路径下应当包含1个或多个子目录，每个子目录对应1段Tianmouc视频。
+            - 支持string格式(仅输入1个地址)或list格式(输入1个或多个地址)。
+               - 这个地址可以是一个tmdat sample的绝对路径，也可以是数据集的路径
+               - 如果是数据集路径(path或者path的任意多层子文件夹内有多个tmdat),可以用matchkey读取特定sample，也可以合并读取
+            - 对于单目数据，每个sample下应包含rod和cone两个目录，多目数据额外还有目录rod_N和cone_N，N为相机编号N>=1
+            - 双目数据补充：20240201测试结果，在实验过程中重启GUI不会导致两个相机标签交换
+                - 只要不插拔并交换接线，整个数据集中相机的idx将保持不变
+        - 输入N：返回的dataset中包含多个sample，每个sample包含(N+1)帧COP，以及中间的所有AOP帧。
+            - 默认N=1，在757fps模式下sample中有F0，F1两帧COP，以及中间的(25+1)帧AOP，最后一帧AOP与下一个sample第1帧AOP相同，可以跳过。
+        - 输入matchkey：在dataPath所有路径下的子目录名称中匹配对应的，否则会输出所有数据。
+            - 若输入超过1个路径，建议不同路径下不要出现同名子目录，否则可能出现bug。
+        - 输入camera_idx：默认为0，表示识别单目输入，若为双目数据，则camera_idx=0,1分别录取双目数据。
+        - 原先版本中的输入参数MAXLEN强制默认设为-1，即始终为读取全部数据。
+        - ## [输出]
+        - 输出dataset调用方式类似于列表，通过sample = dataset[index]逐一获取数据。
+        - sample为字典类型，包含如下key
+            - COP帧依次记录为F0，F1，F2...F(N)
+                - 'F0'默认使用ISP算法调色
+                - 'F0_without_isp'不加额外处理，若加红外滤光片应使用这个数据
+                - 'F0_HDR'为简易融合算法处理结果，由同步的SD和RGB合成高动态图
+            - AOP帧
+                - 'rawDiff'为AOP像素原始输出(160×160，带空洞)
+                - 'tsdiff_160x320'为rawDiff进行插值去空洞后上采样的图像(160×320)
+                - 'tsdiff'为tsdiff_160x320进一步插值得到的与COP同分辨率的图像(320×640)
+                - 上述三个对应的key_value均为张量格式，torch.Size([3, X, height, width])
+                    - 第0个维度为3，分别依次对应TD，SD1，SD2
+                    - 第1个维度对应AOP帧数目，在757fps模式下X=N×25+1
+                    - 第2，3个维度对应AOP帧的分辨率
+            - 'sysTimeStamp'为系统初始时间，用于在多目相机情况下进行时间对齐。
+                - 两相机之间初始时间差为sysTimeStamp1-sysTimeStamp2，单位为秒
+                - COP对齐时若Δt>33ms/2，建议让相机1的第K+Δt/33ms帧COP与相机2的第K帧COP对齐，这样时间差更小。
+            - 'labels'用于标注HDR，HS，Blur，Noisy等4种极端情况分类，暂未实装。
+            - 'meta'包含了该段目录的一些元数据，如文件存储目录，时间戳等等，需要详细数据分析时使用
     '''
     def __init__(self,path,
                  N=1,

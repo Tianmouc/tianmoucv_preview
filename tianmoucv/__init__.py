@@ -9,7 +9,8 @@ import sys
 
 # __init__.py
 __all__ = ['random', 'cv2', 'math', 'torch','os','sys']
-__author__ = 'Y. Lin, T. Wang'
+__author__ = 'Y. Lin'
+__contributor__ = 'T. Wang, Y. Chen'
 __authorEmail__ = '532109881@qq.com'
 
-print('import TianmouCV 0.2.2.2, via',__author__,' pre release version')
+print('TianMouCV™ 0.3.0, via',__author__,', update some nn-based function')
