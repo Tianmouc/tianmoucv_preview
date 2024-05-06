@@ -8,22 +8,12 @@ import torch.nn.functional as F
 try:
     from tianmoucv.rdp_usb import rod_decoder_py as rdc
 except:
-    import subprocess
-    print("WARNING: no decoder found, try to compile under ./rod_decoder_py")
-    current_file_path = os.path.abspath(__file__)
-    parent_folder_path = os.path.dirname(os.path.dirname(current_file_path))
-    aim_path = os.path.join(parent_folder_path,'rdp_usb')
-    os.chdir(aim_path)
-    current_path = os.getcwd()
-    print("Current Path:", current_path)
-    subprocess.run(['sh', './compile_pybind.sh'])
-    from tianmoucv.rdp_usb import rod_decoder_py as rdc
-    print('compile decoder successfully')
+    print("FATAL ERROR: no decoder found, please complie the decoder under ./rod_decoder_py")
 
 #用于重建
 #用于rgb的ISP
 from tianmoucv.proc.reconstruct import laplacian_blending
-from tianmoucv.isp import default_rgb_isp,fourdirection2xy,ACESToneMapping
+from tianmoucv.isp import default_rgb_isp,SD2XY,ACESToneMapping
 
 from ctypes import *
 
@@ -380,8 +370,10 @@ class TianmoucDataReader_basic():
         
             sample['tsdiff_160x320'] = RAW TSD data ajusted to coorect space(with hollow)
             sample['tsdiff'] = TSD data upsample to 320*640
+            sample['F0_raw'] = unprocessed raw data, 320*320, t=t_0
+            sample['F1_raw'] = unprocessed raw data, 320*320, t=t_0
             sample['F0_without_isp'] = only demosaced frame data, 3*320*640, t=t_0
-            sample['F1_without_isp'] = only demosaced frame data, 3*320*640, t=t_0+33ms
+            sample['F1_without_isp'] = only demosaced frame data, 3*320*640, t=t_0
             sample['F0_HDR']: RGB+SD Blended HDR frame data, 3*320*640, t=t_0
             sample['F1_HDR']: RGB+SD Blended HDR frame data, 3*320*640, t=t_0+33ms
             sample['F0']: preprocessed frame data, 3*320*640, t=t_0
@@ -399,11 +391,11 @@ class TianmoucDataReader_basic():
         coneAddrs = legalSample[self.pathways[1]]
         rodAddrs = legalSample[self.pathways[0]]
         
-        start_frame,coneTimeStamp1 = self.readConeFast(conefilename,coneAddrs[0])
-        end_frame,coneTimeStamp2 = self.readConeFast(conefilename,coneAddrs[1])
+        start_frame_raw,coneTimeStamp1 = self.readConeFast(conefilename,coneAddrs[0])
+        end_frame_raw,coneTimeStamp2 = self.readConeFast(conefilename,coneAddrs[1])
         
-        start_frame = np.reshape(start_frame.astype(np.float32),(self.cone_height,self.cone_width))
-        end_frame = np.reshape(end_frame.astype(np.float32),(self.cone_height,self.cone_width))
+        start_frame_raw = np.reshape(start_frame_raw.astype(np.float32),(self.cone_height,self.cone_width))
+        end_frame_raw = np.reshape(end_frame_raw.astype(np.float32),(self.cone_height,self.cone_width))
         
         metaInfo['C_name'] = conefilename
         metaInfo['C_timestamp'] = (coneTimeStamp1.astype(np.int64),coneTimeStamp2.astype(np.int64))
@@ -435,7 +427,7 @@ class TianmoucDataReader_basic():
                 SD_1 = tsd[1:,i,...]
             
         if needPreProcess:
-            start_frame,end_frame,tsdiff_inter,F0_without_isp,F1_without_isp  = self.preprocess(start_frame,end_frame,tsd)
+            start_frame,end_frame,tsdiff_inter,F0_without_isp,F1_without_isp  = self.preprocess(start_frame_raw,end_frame_raw,tsd)
             sample['tsdiff_160x320'] = tsdiff_inter
             tsdiff_resized = F.interpolate(tsdiff_inter,(320,640),mode='bilinear')
             sample['tsdiff'] = tsdiff_resized
@@ -443,7 +435,6 @@ class TianmoucDataReader_basic():
             sample['F1_without_isp'] = F1_without_isp
             sample['F0_HDR'] = self.HDRRecon(SD_0/128.0,start_frame)
             sample['F1_HDR'] = self.HDRRecon(SD_1/128.0,end_frame)
-    
         sample['F0'] = start_frame
         sample['F1'] = end_frame
         sample['rawDiff'] = tsd
@@ -457,7 +448,7 @@ class TianmoucDataReader_basic():
         HDR fusion
         '''
         F0 = torch.Tensor(F0)
-        Ix,Iy= fourdirection2xy(SD)
+        Ix,Iy= SD2XY(SD)
         Ix = F.interpolate(torch.Tensor(Ix).unsqueeze(0).unsqueeze(0), size=(320,640), mode='bilinear').squeeze(0).squeeze(0)
         Iy = F.interpolate(torch.Tensor(Iy).unsqueeze(0).unsqueeze(0), size=(320,640), mode='bilinear').squeeze(0).squeeze(0)
         blend_hdr = laplacian_blending(-Ix,-Iy, srcimg=F0, iteration=20, mask_rgb=True, mask_th = 32)

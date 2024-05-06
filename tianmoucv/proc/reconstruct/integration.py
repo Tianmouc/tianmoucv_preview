@@ -5,11 +5,10 @@ import torch.nn.functional as F
 import os
 import time
 
-from .basic import poisson_blend
-from tianmoucv.isp import fourdirection2xy,upsampleTSD
+from .basic import laplacian_blending
+from tianmoucv.isp import SD2XY,upsampleTSD
 
-
-def grayReconstructor(tsdiff,F0,F1,t, TD_BG_NOISE = 0, threshGate=4/255, dig_scaling= 1.5):
+def TD_integration(tsdiff,F0,F1,t, TD_BG_NOISE = 0, threshGate=4/255, dig_scaling= 1.5):
     '''
     AOP+COP合成灰度
     
@@ -17,7 +16,7 @@ def grayReconstructor(tsdiff,F0,F1,t, TD_BG_NOISE = 0, threshGate=4/255, dig_sca
     
     2. 计算AOP到COP的线性缩放系数
     
-    3. SD使用泊松blending合成灰度
+    3. laplacian_blending
     
     4. 双向TD积累+SD灰度合成最终结果
     
@@ -55,15 +54,7 @@ def grayReconstructor(tsdiff,F0,F1,t, TD_BG_NOISE = 0, threshGate=4/255, dig_sca
 
     forward_TD =  torch.sum(TD[0:t,...],dim=0)
     backward_TD =  torch.sum(TD[t:,...],dim=0)
-    #print(TD[0:t,...].shape,TD[t:,...].shape,TD.shape)
-    
-    '''
-    SDt = tsdiff[1:,t,...].permute(1,2,0) * (AOP_COP_scale_neg+AOP_COP_scale_pos)/2
-    Ix,Iy = fourdirection2xy(SDt)
-    gray = -poisson_blend(Ix,Iy,iteration=20)
-    gray = F.interpolate(gray.unsqueeze(0).unsqueeze(0), 
-                         size=(320,640), mode='bilinear').squeeze(0).squeeze(0)
-    '''
+
 
     forward_TD  = F.interpolate(forward_TD.unsqueeze(0).unsqueeze(0), size=(320,640), mode='bilinear').squeeze(0).squeeze(0)
     backward_TD = F.interpolate(backward_TD.unsqueeze(0).unsqueeze(0), size=(320,640), mode='bilinear').squeeze(0).squeeze(0)
@@ -75,3 +66,16 @@ def grayReconstructor(tsdiff,F0,F1,t, TD_BG_NOISE = 0, threshGate=4/255, dig_sca
     
     return hdr
 
+
+def SD_integration(SDx:np.array, SDy:np.array)  -> np.array:
+    '''
+    SD直接积分累加重建，简单可视化用
+    use mapped SDx and SDy to conduct direct integration
+    '''
+    canvas = np.zeros([SDx.shape[0],SDx.shape[1]+1])
+    grayy = np.cumsum(SDy,axis=0)
+    goody_first = grayy[:,0]
+    canvas[:,0] = goody_first
+    canvas[:,1:] = SDx
+    gray = np.cumsum(canvas[:,:-1],axis=1)
+    return gray

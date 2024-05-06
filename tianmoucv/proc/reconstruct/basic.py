@@ -28,7 +28,7 @@ def laplacian_blending_1c(Ix,Iy,gray,iteration=50):
     # Return the blended image
     return lap_blend
 
-def laplacian_blending_1c_batch(Ix,Iy,gray,iteration=50):
+def laplacian_blending_1c_batch(Ix,Iy,gray=None,iteration=50):
     '''
     # 灰度重建-支持batch的网络训练用接口
     # vectorized by Y. Lin
@@ -53,12 +53,10 @@ def laplacian_blending_1c_batch(Ix,Iy,gray,iteration=50):
     # Return the blended image
     return lap_blend
 
-#兼容旧接口
-def poisson_blend(Ix,Iy,iteration=50):
-    return laplacian_blending_1c(Ix,Iy,None,iteration=iteration)
-
 def genMask(gray,th = 24, maxV=255, minV = 0):
-
+    '''
+    生成过欠曝区域遮罩
+    '''
     gap = maxV- minV
     mask_ts = ( (gray < (maxV-th)/gap) * (gray > (minV+th)/gap) ).float()
     mask_np = mask_ts.cpu().numpy()
@@ -84,7 +82,7 @@ def laplacian_blending(Ix,Iy,srcimg=None, iteration=20, mask_rgb=False, mask_th 
     result = None
     
     if srcimg is None:
-        result = laplacian_blending_1c(Ix,Iy,iteration=iteration)
+        result = laplacian_blending_1c(Ix,Iy,gray=srcimg,iteration=iteration)
     elif len(srcimg.shape)==2:
         img = srcimg.clone()
         result = laplacian_blending_1c(Ix,Iy,img,iteration=iteration)
@@ -173,4 +171,3 @@ def batch_inference(model,sample,
 
         return Ft_batch
     
-

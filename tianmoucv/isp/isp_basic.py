@@ -1,7 +1,6 @@
 #基础的一些isp操作与可视化函数，有些和算法的效果绑定
 __author__ = 'Y. Lin'
 __authorEmail__ = '532109881@qq.com'
-import torch
 import numpy as np
 from scipy.signal import convolve2d
 import cv2
@@ -412,7 +411,7 @@ def vizDiff(diff,thresh=0):
         diff = diff[...,0]
         w,h = diff.shape
         
-    rgb_diff = torch.ones([3,w,h]) * 255
+    rgb_diff = np.ones([3,w,h]) * 255
     diff[abs(diff)<thresh] = 0
     rgb_diff[0,...][diff>0] = 0
     rgb_diff[1,...][diff>0] = diff[diff>0]

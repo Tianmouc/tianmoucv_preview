@@ -6,7 +6,7 @@ import torch.nn as nn
 # ===============================================================
 # 用算出的光流插帧
 # =============================================================== 
-def interpolate_image(image, u,v):
+def interpolate_image(image:np.array, u: torch.Tensor,v: torch.Tensor):
     '''
     用算出的光流插帧
 
@@ -31,7 +31,7 @@ def interpolate_image(image, u,v):
 # ===============================================================
 # 可视化光流
 # ===============================================================
-def compute_color(u, v):
+def compute_color(u:np.array, v:np.array):
     """
     compute optical flow color map
     :param u: optical flow horizontal map
@@ -109,7 +109,7 @@ def make_color_wheel():
 # ===============================================================
 # 光流uv to RGB
 # ===============================================================
-def flow_to_image(flow):
+def flow_to_image(flow:np.array):
     """
     Convert flow into middlebury color code image
     :param flow: optical flow map
@@ -167,7 +167,7 @@ class backWarp(nn.Module):
         self.gridX = torch.tensor(gridX, requires_grad=False, device=device)
         self.gridY = torch.tensor(gridY, requires_grad=False, device=device)
         
-    def forward(self, img, flow):
+    def forward(self, img:torch.Tensor, flow:torch.Tensor):
         # uv有奇怪的偏移
         MAGIC_NUM =  0.5
         # Extract horizontal and vertical flows.
@@ -197,14 +197,12 @@ class opticalDetector_Maxone():
         self.accumU = 0
         self.accumV = 0
         
-    def __call__(self,sd,td,ifInterploted = False):
+    def __call__(self,sd:torch.Tensor,td:torch.Tensor,ifInterploted = False):
         
         td[abs(td)<self.noiseThresh] = 0
         sd[abs(sd)<self.noiseThresh] = 0
-       
-        #rawflow = cal_optical_flow(sd,td,win=7,stride=3,mask=None,ifInterploted = ifInterploted)
-        #rawflow = recurrentOF(sd,td,ifInterploted = ifInterploted)
-        rawflow = recurrentMultiScaleOF(sd,td,ifInterploted = ifInterploted)
+
+        rawflow = HS_optical_flow(sd,td,ifInterploted = ifInterploted)
         
         flow = flow_to_image(rawflow.permute(1,2,0).numpy())
         

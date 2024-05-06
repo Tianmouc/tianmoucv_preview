@@ -134,45 +134,6 @@ class up(nn.Module):
         return x
 
 
-##Training Weakly Supervised Video Frame Interpolation with Events(accepted by ICCV2021)
-class FuseLayer(nn.Module):
-    def __init__(self, c_h, c_ef,debug=False):
-        super(FuseLayer, self).__init__()
-        self.c_ef = c_ef
-        self.c_h = c_h
-        self.debug = debug
-
-        self.convE1 = nn.Conv2d(c_ef, c_h, kernel_size=1, stride=1, padding=0, bias=True)
-        self.convE2 = nn.Conv2d(c_ef, c_h, kernel_size=1, stride=1, padding=0, bias=True)
-
-        self.convF1 = nn.Conv2d(c_ef, c_h, kernel_size=1, stride=1, padding=0, bias=True)
-        self.convF2 = nn.Conv2d(c_ef, c_h, kernel_size=1, stride=1, padding=0, bias=True)
-
-        self.convMask = nn.Sequential(nn.ReplicationPad2d(padding=[1, 1, 1, 1]),
-                                      nn.Conv2d(c_h, 1, kernel_size=3, stride=1, bias=False),
-                                      nn.Sigmoid())
-
-    def forward(self, h, z_e, z_f,h_prompt=None):
-        gammaE = self.convE1(z_e)
-        betaE = self.convE2(z_e)
-        E = gammaE * h + betaE
-
-        gammaF = self.convF1(z_f)
-        betaF = self.convF2(z_f)
-        F = gammaF * h + betaF
-
-        if h_prompt is None:
-            h_prompt = h 
-            
-        M = self.convMask(h_prompt)
-        out = M * E + (1.0 - M) * F
-
-        if self.debug:
-            print('>>>recon rate:',float(torch.mean(M)),' flow rate:',float(torch.mean(1-M)),float(torch.std(M)) )
-            # tmp_mask_attn_img = torch.mean(M,dim=1).detach().cpu().numpy()[0,...] * 255
-            # cv2.imwrite('./tmp.png',tmp_mask_attn_img.astype(np.uint8))
-        return out,M
-
 
 class Interp(nn.Module):
     def __init__(self, scale=None, size=None):
@@ -184,47 +145,7 @@ class Interp(nn.Module):
         y = F.interpolate(x, self.size, self.scale, mode='bilinear', align_corners=True)
         return y
 
-    
-class FuseBlock(nn.Module):
-    def __init__(self, cin, cout, c_ef,debug=False):
-        super(FuseBlock, self).__init__()
-        self.cin = cin
-        self.cout = cout
-        self.debug = debug
 
-        self.AAD1 = FuseLayer(cin, c_ef,self.debug)
-        self.conv1 = nn.Sequential(
-            nn.LeakyReLU(negative_slope=0.2, inplace=True),
-            nn.ReplicationPad2d(padding=[1, 1, 1, 1]),
-            nn.Conv2d(cin, cin, kernel_size=3, stride=1, bias=True)
-        )
-
-        self.AAD2 = FuseLayer(cin, c_ef)
-        self.conv2 = nn.Sequential(
-            nn.LeakyReLU(negative_slope=0.2, inplace=True),
-            nn.ReplicationPad2d(padding=[1, 1, 1, 1]),
-            nn.Conv2d(cin, cout, kernel_size=3, stride=1, bias=True)
-        )
-
-        if cin != cout:
-            self.AAD3 = FuseLayer(cin, c_ef)
-            self.conv3 = nn.Sequential(
-                nn.LeakyReLU(negative_slope=0.2, inplace=True),
-                nn.ReplicationPad2d(padding=[1, 1, 1, 1]),
-                nn.Conv2d(cin, cout, kernel_size=3, stride=1, bias=True)
-            )
-
-    def forward(self, h, z_e,z_f,h_prompt = None):
-        x,M = self.AAD1(h,z_e,z_f,h_prompt)
-        x = self.conv1(x)
-        x,M = self.AAD2(x,z_e,z_f,h_prompt)
-        x = self.conv2(x)
-        if self.cin != self.cout:
-            h,M = self.AAD3(h,z_e,z_f,h_prompt)
-            h = self.conv3(h)
-        x = x + h
-        return x,M
-    
 
 #############################
 #  @simpleNN

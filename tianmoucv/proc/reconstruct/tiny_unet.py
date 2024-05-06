@@ -5,21 +5,21 @@ import torch.nn.functional as F
 import os
 import time
 
-from .basic import poisson_blend
+from .basic import laplacian_blending
 
 from tianmoucv.tools import check_url_or_local_path,download_file
 from tianmoucv.proc.nn.unet_modules import UNetRecon
-from tianmoucv.isp import fourdirection2xy,upsampleTSD
+from tianmoucv.isp import upsampleTSD
 from tianmoucv.proc.nn.utils import tdiff_split
 
-class Reconstrutor_NN(nn.Module):
+class TianmoucRecon_tiny(nn.Module):
     '''
     重建网络
     权重链接:https://cloud.tsinghua.edu.cn/f/2baddb35cc034d31956e/?dl=1
     old:https://cloud.tsinghua.edu.cn/f/9d4adcfa7f0245959747/?dl=1
     '''
     def __init__(self,ckpt_path =None,_optim=True):
-        super(Reconstrutor_NN, self).__init__()
+        super(TianmoucRecon_tiny, self).__init__()
         current_dir=os.path.dirname(__file__)
         
         if ckpt_path is None:

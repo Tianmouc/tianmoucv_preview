@@ -1,18 +1,29 @@
-import torch.nn.functional as F
-import torch.nn as nn
-import numpy as np
-from scipy import signal
-from PIL import Image
-from tianmoucv import *
 import cv2
 import sys
-import torch.nn.functional as F
-import torch
+
+import numpy as np
 from scipy.optimize import linear_sum_assignment
+from scipy import signal
+from PIL import Image
+
+import torch
+import torch.nn.functional as F
+import torch.nn as nn
+
+
+#===============================================================
+# sobel
+# ===============================================================
+def sobel_operator(Ix, Iy):
+    # 计算梯度幅值
+    magnitude = torch.sqrt(torch.pow(Ix, 2) + torch.pow(Iy, 2))
+    # 计算梯度角度
+    angle = torch.atan2(Iy, Ix)
+    return magnitude, angle
 
 
 # ===============================================================
-# 一些基本工具
+# 高斯卷积核
 # ===============================================================
 def gaussain_kernel(size=5,sigma=2):
     '''
@@ -33,6 +44,10 @@ def gaussain_kernel(size=5,sigma=2):
     kernel = kernel.unsqueeze(0).unsqueeze(0)
     return kernel
 
+
+# ===============================================================
+# 用现有高斯核做高斯模糊
+# ===============================================================
 def gaussian_smooth(inputTensor: torch.Tensor, kernel: torch.Tensor) -> torch.Tensor:
     '''
     用现有高斯核做高斯模糊
@@ -49,14 +64,11 @@ def gaussian_smooth(inputTensor: torch.Tensor, kernel: torch.Tensor) -> torch.Te
     return F.conv2d(input_padded, kernel, stride=1, padding=0)
 
 
-#=============================================================================================================================
-# 检测器
-#==============================================================================================================================
 
 # ===============================================================
 # Harris角点，用Ix和Iy做计算，可以用SD的两个方向
 # ===============================================================
-def HarrisCorner(Ix,Iy,k = 0.1,th = 0.5,size=5,sigma=1,nmsSize=11):
+def HarrisCorner(Ix:torch.Tensor,Iy:torch.Tensor,k = 0.1,th = 0.5,size=5,sigma=1,nmsSize=11):
     '''
     Harris 角点检测
     
@@ -98,12 +110,12 @@ def HarrisCorner(Ix,Iy,k = 0.1,th = 0.5,size=5,sigma=1,nmsSize=11):
     R = R[idmap>0]
         
     return idmap,R
- 
+
+
 # ===============================================================
 # Shi-Tomasi角点，用Ix和Iy做计算，可以用SD的两个方向
 # ===============================================================
-
-def TomasiCorner(Ix, Iy, index=1000,size=5,sigma=2,nmsSize=11):
+def TomasiCorner(Ix:torch.Tensor, Iy:torch.Tensor, index=1000,size=5,sigma=2,nmsSize=11):
     '''
     Shi-Tomasi 角点检测
     在Harris角点检测的基础上，Shi和Tomasi 在1993的一篇论文《Good Features to track》中提出了基于Harris角点检测的Shi-Tomasi方法。
@@ -146,7 +158,7 @@ def TomasiCorner(Ix, Iy, index=1000,size=5,sigma=2,nmsSize=11):
 # ===============================================================
 # ******in testing******  Harris3D角点，用Ix和Iy做计算，可以用SD的两个方向
 # ===============================================================
-def HarrisCorner3(Ix,Iy,It,k = 0.5,th = 0.95,size=5,sigma=2):
+def HarrisCorner3(Ix:torch.Tensor,Iy:torch.Tensor,It:torch.Tensor,k = 0.5,th = 0.95,size=5,sigma=2):
     '''
     Harris3D角点，用Ix和Iy做计算，可以用SD的两个方向
     
@@ -211,16 +223,12 @@ def HarrisCorner3(Ix,Iy,It,k = 0.5,th = 0.95,size=5,sigma=2):
 
 
 
-#=============================================================================================================================
-# 描述子
-#==============================================================================================================================
-
 
 #===============================================================
 # ******HOG****** 
 # ===============================================================
 
-def hog(Ix,Iy,kplist):
+def hog(Ix:torch.Tensor,Iy:torch.Tensor,kplist:list):
     '''
     hog 特征描述
     
@@ -258,11 +266,12 @@ def hog(Ix,Iy,kplist):
         discriptorList.append(histogram)
         goodkp.append(kp)
     return goodkp,discriptorList
-        
+
+
 #===============================================================
 # ******简化版SIFT中的描述子，缺少多尺度****** 
 # ===============================================================
-def sift(Ix,Iy, keypoints):
+def sift(Ix:torch.Tensor,Iy:torch.Tensor, keypoints:list):
     '''
     **简化版SIFT中的描述子，缺少多尺度**
     
@@ -283,8 +292,6 @@ def sift(Ix,Iy, keypoints):
     for kp in keypoints:
         descriptorlist = []
         y, x = int(kp[0]), int(kp[1])
-        
-        #0831晚上修改：可能要取平均一下，噪声影响大，主方向比较重要
         Xneighbor = Ix[y-1:y+2,x-1:x+2]
         Yneighbor = Iy[y-1:y+2,x-1:x+2]
         mask = (Xneighbor!=0) & (Yneighbor!=0)
@@ -315,5 +322,4 @@ def sift(Ix,Iy, keypoints):
             count += 1
             goofkp.append(kp)
 
-    #print(descriptors)
     return goofkp,descriptors

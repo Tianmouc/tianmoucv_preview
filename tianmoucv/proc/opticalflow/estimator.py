@@ -9,10 +9,7 @@ import time
 from .basic import *
 from tianmoucv.isp import *
 
-# ===============================================================
-# LK方法计算稠密光流 
-# ===============================================================
-def local_norm(Diff):
+def local_norm(Diff: torch.Tensor) -> torch.Tensor:
     '''
     梯度归一化
     
@@ -20,11 +17,14 @@ def local_norm(Diff):
         :param SD: 待归一化项
 
     '''
-
     grad_norm = (Diff[0,...]**2 + Diff[1,...]**2 + 1e-18)**0.5 + 1e-9
     return Diff / torch.max(grad_norm)
-        
-def cal_optical_flow(SD,TD,win=5,stride=0,mask=None,ifInterploted = False):    
+    
+# ===============================================================
+# LK方法计算稠密光流 
+# ===============================================================
+def LK_optical_flow(SD: torch.Tensor ,TD: torch.Tensor, win=5,
+                    stride=0,mask=None,ifInterploted = False) -> torch.Tensor:    
     '''
     LK方法计算稠密光流
     
@@ -41,6 +41,10 @@ def cal_optical_flow(SD,TD,win=5,stride=0,mask=None,ifInterploted = False):
     '''
     I = SD.size(-2)
     J = SD.size(-1)
+    
+    SD = SD.cpu()
+    TD = TD.cpu()
+    
     i_step  = win//2
     j_step  = win//2
     if stride == 0:
@@ -87,75 +91,14 @@ def cal_optical_flow(SD,TD,win=5,stride=0,mask=None,ifInterploted = False):
         flow = F.interpolate(flow.unsqueeze(0), size=(I,J), mode='bilinear').squeeze(0)
     return flow
 
-# ===============================================================
-# HS方法计算稠密光流，效果更好
-# ===============================================================
-def recurrentOF(SD,TD,ifInterploted = False):
-    '''
-    HS方法计算稠密光流
-    ![referemce](https://kns.cnki.net/kcms2/article/abstract?v=3uoqIhG8C475KOm_zrgu4h_jQYuCnj_co8vp4jCXSivDpWurecxFtEV8HAD0GySfgFWAxYnv5c-oQfA7zWjworscSCTy1fWb&uniplatform=NZKPT)
-    
-    .. math:: Energy_term = (u+v+\lambda)^2?
-    .. math:: newu = u - Ix * (Ix*u + Iy * v + It) / (\lambda*\lambda + Ix*Ix + Iy*Iy)
-    .. math:: newv = v - Iy * (Ix*u + Iy * v + It) / (\lambda*\lambda + Ix*Ix + Iy*Iy)
-
-    parameter:
-        :param SD: 原始SD，SD[0,1]: x,y方向上的梯度,[2,h,w],torch.Tensor
-        :param TD: 原始SD，TD[0]: t方向上的梯度,[1,h,w],torch.Tensor
-        :param ifInterploted = False: 计算结果是否与COP等大
-
-    '''
-    epsilon = 1e-8
-    maxIteration = 50
-    
-    def uitter(u,v,Ix,Iy,It,lambdaL):
-        newu = u - Ix * (Ix*u + Iy * v + It) / (lambdaL*lambdaL + Ix*Ix + Iy*Iy)
-        return newu
-    def vitter(u,v,Ix,Iy,It,lambdaL):
-        newv = v - Iy * (Ix*u + Iy * v + It) / (lambdaL*lambdaL + Ix*Ix + Iy*Iy)
-        return newv
-        
-    uitter_vector = np.vectorize(uitter)
-    vitter_vector = np.vectorize(vitter)
-        
-    I = SD.size(-2)
-    J = SD.size(-1)
-    
-    #加权
-    Ix = SD[0,...].numpy()
-    Iy = SD[1,...].numpy()
-    It = TD[0,...].numpy()
-    
-    u = np.zeros([I,J])
-    v = np.zeros([I,J])
-
-    lambdaL = np.ones([I,J])
-    
-    for it in range(maxIteration):
-        u_new = uitter_vector(u,v,Ix,Iy,It,lambdaL)
-        v_new = vitter_vector(u,v,Ix,Iy,It,lambdaL)
-        erroru = abs(u_new-u)
-        errorv = abs(v_new-v)
-        u = u_new
-        v = v_new
-        if np.max(erroru) < epsilon and np.max(errorv) < epsilon:
-            break
-    flow = torch.stack([torch.FloatTensor(u),torch.FloatTensor(v)],dim=0)
-    
-    if not ifInterploted:
-        flow = F.interpolate(flow.unsqueeze(0), size=(I,J*2), mode='bilinear').squeeze(0)
-    else:
-        flow = F.interpolate(flow.unsqueeze(0), size=(I,J), mode='bilinear').squeeze(0)
-    return flow
-
 
 # ===============================================================
 # 多尺度HS方法计算稠密光流，效果更好
 # ===============================================================
-def recurrentMultiScaleOF(SD,TD,ifInterploted = False,epsilon = 1e-8,maxIteration = 50,scales = 4,labmda=10):
+def HS_optical_flow(SD: torch.Tensor,TD: torch.Tensor,
+                    ifInterploted = False,epsilon = 1e-8,maxIteration = 50,scales = 4,labmda=10) -> torch.Tensor:    
     '''
     多尺度HS方法计算稠密光流，效果更好
-
     parameter:
         :param SD: 原始SD，SD[0,1]: x,y方向上的梯度,[2,h,w],torch.Tensor
         :param TD: 原始SD，TD[0]: t方向上的梯度,[1,h,w],torch.Tensor

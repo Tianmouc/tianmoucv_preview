@@ -1,48 +1,56 @@
 import torch
+import torch.nn.functional as F
+
 import numpy as np
 from scipy.spatial import ConvexHull
+from typing import Union
 
 # ===============================================================
 # SD坐标变换
 # ===============================================================
-#axis mapping
-#mapping ruls: tianmouc pixel pattern
-def fourdirection2xy(sd):
-    #print("warning: 0711version, Ix may be wrong direction")
-    if len(sd.shape)==4:
-        #input: [b,2,w,h]
-        #output: [b,2,w,h]
-        Ixy = torch.zeros(sd.shape).to(sd.device)
-        sdul = sd[:,0,0::2,...]
-        sdll = sd[:,0,1::2,...]
-        sdur = sd[:,1,0::2,...]
-        sdlr = sd[:,1,1::2,...]
-        Ixy[:,0, ::2,...] = Ixy[:,0,1::2,...] = ((sdul + sdll)/1.414 - (sdur + sdlr)/1.414)/2
-        Ixy[:,0,1::2,...] = Ixy[:,1, ::2,...] = ((sdur - sdlr)/1.414 + (sdul - sdll)/1.414)/2
-        return Ixy
-    else:
-        #input: [w,h,2]
-        #output: [w,h],[w,h]
-        if sd.shape[-1] == 2:
-            Ix = torch.zeros(sd.shape[:2]).to(sd.device)
-            Iy = torch.zeros(sd.shape[:2]).to(sd.device)
-            sdul = sd[0::2,...,0]
-            sdll = sd[1::2,...,0]
-            sdur = sd[0::2,...,1]
-            sdlr = sd[1::2,...,1]
-            Ix[::2,...] = Ix[1::2,...]= ((sdul + sdll)/1.414 - (sdur + sdlr)/1.414)/2
-            Iy[1::2,...]= Iy[::2,...] = ((sdur - sdlr)/1.414 + (sdul - sdll)/1.414)/2
-            return Ix,Iy
+def SD2XY(sd_raw:torch.tensor) -> torch.tensor:
+    '''
+    input: [h,w,2]/[2,h,w]/[n,2,h,w]
+    output: [h,2*w],[h,2*w] or [n,h,2*w],[n,h,2*w]
+    坐标变换规则参照http://www.tianmouc.cn:40000/tianmoucv/introduction.html
+    '''
+    if len(sd_raw.shape) == 3:
+        assert (sd_raw.shape[2]==2 or sd_raw.shape[0]==2)
+        if sd_raw.shape[2] == 2:
+            sd = sd_raw.permute(2,0,1).unsqueeze(0) #[h,w,c]->[1,c,h,w]
         else:
-            Ix = torch.zeros(sd.shape[1:]).to(sd.device)
-            Iy = torch.zeros(sd.shape[1:]).to(sd.device)
-            sdul = sd[0,0::2,...]
-            sdll = sd[0,1::2,...]
-            sdur = sd[1,0::2,...]
-            sdlr = sd[1,1::2,...]
-            Ix[::2,...] = Ix[1::2,...]= ((sdul + sdll)/1.414 - (sdur + sdlr)/1.414)/2
-            Iy[1::2,...]= Iy[::2,...] = ((sdur - sdlr)/1.414 + (sdul - sdll)/1.414)/2
-            return Ix,Iy
+            sd = sd_raw.unsqueeze(0)
+    else:
+        assert (len(sd_raw.shape) == 4 and sd_raw.shape[1]==2)
+        sd = sd_raw
+        
+    b,c,h,w = sd.shape
+    sdul = sd[:,0:1,0::2,...]
+    sdll = sd[:,0:1,1::2,...]
+    sdur = sd[:,1:2,0::2,...]
+    sdlr = sd[:,1:2,1::2,...]
+
+    target_size = (h,w*2)
+    sdul = F.interpolate(sdul, size=target_size, mode='bilinear', align_corners=False)
+    sdll = F.interpolate(sdll, size=target_size, mode='bilinear', align_corners=False)
+    sdur = F.interpolate(sdur, size=target_size, mode='bilinear', align_corners=False)
+    sdlr = F.interpolate(sdlr, size=target_size, mode='bilinear', align_corners=False)
+
+    sdx = ((sdul + sdll)/1.414 - (sdur + sdlr)/1.414)/2
+    sdy = ((sdur - sdlr)/1.414 + (sdul - sdll)/1.414)/2
+
+    if len(sd_raw.shape) == 3:
+        return sdx.squeeze(0).squeeze(0), sdy.squeeze(0).squeeze(0)
+    else:
+        return sdx.squeeze(1), sdy.squeeze(1)
+
+
+# ===============================================================
+# SD坐标变换
+# ===============================================================
+def fourdirection2xy(sd: Union[np.array,torch.tensor]) -> Union[np.array,torch.tensor]:
+    print('fourdirection2xy is decrepted, please use SD2XY')
+    return SD2XY(sd)
 
 # ===============================================================
 # 自卷积

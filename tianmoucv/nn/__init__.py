@@ -1,2 +1,2 @@
 from tianmoucv.proc.nn import *
-print("用以兼容旧版本")
+print("tianmoucv.nn is decrepted, please use tianmoucv.proc.nn")

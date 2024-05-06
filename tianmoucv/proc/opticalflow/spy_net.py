@@ -11,7 +11,7 @@ from tianmoucv.isp import *
 from tianmoucv.proc.nn.spy_modules import *
 from tianmoucv.tools import check_url_or_local_path,download_file
 
-class DenseOF_NN(nn.Module):
+class TianmoucOF_SpyNet(nn.Module):
     '''
     计算稠密光流的nn方法
     默认权重存储于'of_0918_ver_best.ckpt'
@@ -25,7 +25,7 @@ class DenseOF_NN(nn.Module):
     '''
     #temp network
     def __init__(self,imgsize,ckpt_path = None):
-        super(DenseOF_NN, self).__init__()
+        super(TianmoucOF_SpyNet, self).__init__()
         current_dir=os.path.dirname(__file__)
         
         if ckpt_path is None:
@@ -67,7 +67,7 @@ class DenseOF_NN(nn.Module):
             print('compiled!')
 
     @torch.no_grad() 
-    def forward_time_range(self, tsdiff,t1,t2,F0=None):
+    def forward_time_range(self, tsdiff: torch.Tensor,t1,t2,F0=None):
         '''
         Args:
           @tsdiff: [c,n,w,h], -1~1,torch，decoder的输出直接concate的结果

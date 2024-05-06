@@ -21,7 +21,7 @@ except:
     
 #用于重建
 from tianmoucv.proc.reconstruct import laplacian_blending
-from tianmoucv.isp import default_rgb_isp,fourdirection2xy
+from tianmoucv.isp import default_rgb_isp
 from .tianmoucData_basic import TianmoucDataReader_basic
 
 class TianmoucDataReader(TianmoucDataReader_basic):
@@ -130,6 +130,10 @@ class TianmoucDataReader(TianmoucDataReader_basic):
                         newsample_merge[self.pathways[1]] += sample_1[self.pathways[1]][1:]
                         newsample_merge[self.pathways[0]] += sample_1[self.pathways[0]][1:]
                         accum_count += 1
+                    else:
+                        newsample_merge = dict([])
+                        accum_count = 1
+                        continue
                 
                 if len(new_legalFileList)>MAXLEN:
                     new_legalFileList = new_legalFileList[:MAXLEN]
@@ -165,11 +169,14 @@ class TianmoucDataReader(TianmoucDataReader_basic):
         
         rgb_list = []
         coneTimeStamp_list = []
-        
+        raw_list = []
+
         for i in range(self.N+1):
             #print('caddr:',coneAddrs[i])
             frame,timestamp = self.readConeFast(conefilename,coneAddrs[i])
+            frame_raw = np.reshape(frame.copy(), (self.cone_height,self.cone_width))
             frame = np.reshape(frame.astype(np.float32),(self.cone_height,self.cone_width))
+            raw_list.append(frame_raw)
             rgb_list.append(frame)
             coneTimeStamp_list.append(timestamp.astype(np.int64))
 
@@ -206,8 +213,10 @@ class TianmoucDataReader(TianmoucDataReader_basic):
             
             for i in range(self.N+1): 
                 frame,frame_without_isp = self.rgb_preprocess(rgb_list[i])
+                frame_raw = raw_list[i]
                 sample['F'+str(i)+'_without_isp'] = frame_without_isp
                 sample['F'+str(i)] = frame
+                sample['F' + str(i)+"_raw"] = frame_raw
                 SD_t = tsd[1:,mingap*i,...]
                 sample['F'+str(i)+'_HDR'] = self.HDRRecon(SD_t/128.0,frame)
         sample['meta'] = metaInfo
