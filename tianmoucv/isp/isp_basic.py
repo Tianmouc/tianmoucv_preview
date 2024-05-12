@@ -4,64 +4,57 @@ __authorEmail__ = '532109881@qq.com'
 import numpy as np
 from scipy.signal import convolve2d
 import cv2
+import torch
+
+from .awb import gray_world_awb, AutoWhiteBalance
 
 ##############################
 #1. 图像基本处理
 #2. 可视化
 ##############################
-def default_rgb_isp(raw,gamma = 1.4, curve_factor = 0.015, saturation_factor = (32,24,48), denoising = False, raw_input = True, origin_demosaic=False):
+raw_awb = AutoWhiteBalance()
+
+def default_rgb_isp(raw, blc = 0, gamma = 0.9, raw_input = True):
     '''
     默认的RGB RAW数据处理流程
-    
     - 空洞填补
     - 去马赛克
     - 白平衡
-    - 自适应降噪
-    - 自动饱和度
-    - 自动曲线
-    - 自动归一化
-
-    注意: 速度非常慢，仅供参考
+    - gamma
+    - blc
     '''
     #fill hole
     if raw_input:
+        raw = raw.astype(np.float32)
+        raw = raw - blc
+        raw[raw<0]=0
+
+        image_demosaic_withoutisp = exp_bayer_to_rgb_conv(raw)
+
         raw = lyncam_raw_comp(raw)
-
+        
+        blc_avg = np.mean(blc)
+        raw_after_awb = raw_awb(raw,method='GW',blc_avg=blc_avg)
+        raw_after_awb[raw_after_awb>1023]=1023
+        
         #adjust gamma
-        raw_gamma = (raw/1024.0)**(1/gamma)*1024.0
-
-        #antialiasing
-        #aaf = AAF(raw_gamma)
-        #raw_aaf = aaf.execute()
+        raw_gamma = (raw_after_awb/1024.0)**(1/gamma)*1024.0
 
         #demosacing
-        if origin_demosaic:
-            image_demosaic = demosaicing_npy(raw_gamma, 'bggr', 1, 10)
-        else:
-            image_demosaic = exp_bayer_to_rgb_conv(raw_gamma)
-        
+        image_demosaic = exp_bayer_to_rgb_conv(raw_gamma)
     else:
-        image_demosaic = (raw/1024.0)**(1/gamma)*1024.0
-
-    #AWB
-    image = white_balance(image_demosaic.copy(),HSB=1023)
+        image_demosaic_withoutisp = (raw/1024.0)**(1/gamma)*1024.0
+        image_demosaic = gray_world_awb(image_demosaic_withoutisp.copy(),HSB=1023)
     
-    image = (image/4.0).astype(np.uint8)
-    
-    #denoising(a little bit slow,cost 0.8s, while others cost 0.05s)
-    if denoising:
-        image = cv2.fastNlMeansDenoising(image)
-   
     #adjust_saturation
-    image = adjust_saturation(image,saturation_factor)
-    
+    #saturation_factor = (96,128)
+    #image = adjust_saturation(image,saturation_factor)
     #adjust_curve
-    image = adjust_curve(image,curve_factor)
-
-    #norm to 0-1
-    image = image.astype(np.float32)/256.0
+    #curve_factor = 0.02
+    #image = adjust_curve(image,curve_factor)
+    image = image_demosaic.astype(np.float32)
     
-    return image,image_demosaic/1024.0
+    return image/1024.0,image_demosaic_withoutisp/1024.0
             
 
 # ===============================================================
@@ -78,7 +71,6 @@ def ACESToneMapping(color, adapted_lum=1):
     E = 0.14
     color *= adapted_lum
     return (color * (A * color + B)) / (color * (C * color + D) + E)
-
 
 
 # ===============================================================
@@ -111,37 +103,9 @@ def adjust_curve(image, curve_factor = 0.02):
 
     return output_image
 
-# ===============================================================
-# 白平衡调整——灰度世界假设
-#:param img: cv2.imread读取的图片数据
-#:return: 返回的白平衡结果图片数据
-# ===============================================================
-def white_balance(img,HSB=256):
-    '''
-    白平衡调整——灰度世界假设
-    
-    :param img: cv2.imread读取的图片数据
-    :return: 返回的白平衡结果图片数据
-    
-    '''
-    B, G, R = img[:, :, 0], img[:, :, 1], img[:, :, 2]
-    B_ave, G_ave, R_ave = np.mean(B), np.mean(G), np.mean(R)
-    K = (B_ave + G_ave + R_ave) / 3
-    Kb, Kg, Kr = K / (B_ave+1e-8), K / (G_ave+1e-8), K / (R_ave+1e-8)
-    Ba = (B * Kb)
-    Ga = (G * Kg)
-    Ra = (R * Kr)
-    Ba[Ba>HSB] = HSB
-    Ga[Ga>HSB] = HSB
-    Ra[Ra>HSB] = HSB
-    img[:, :, 0] = Ba
-    img[:, :, 1] = Ga
-    img[:, :, 2] = Ra
-    #print('wb:',np.max(img))
-    return img
 
 
-def adjust_saturation(image, saturation_factor = (48,48,64)):
+def adjust_saturation(image, saturation_factor = (128,256)):
     '''
     
     饱和度调整
@@ -152,7 +116,7 @@ def adjust_saturation(image, saturation_factor = (48,48,64)):
     
     '''
 
-    target,threshold,max_value = saturation_factor
+    target,max_value = saturation_factor
 
     # 将图像转换为HSV颜色空间
     hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
@@ -163,8 +127,7 @@ def adjust_saturation(image, saturation_factor = (48,48,64)):
     factor = target / (1e-8+np.mean(V))
     V = V * factor
 
-    mask = V > threshold
-    V[mask] = max_value + -np.exp(-(V[mask]-threshold)/((max_value-threshold))) * (max_value-threshold)
+    V = max_value *(1 -np.exp(-V/max_value) )
 
     hsv_image[:,:,1] = V
     
@@ -411,7 +374,7 @@ def vizDiff(diff,thresh=0):
         diff = diff[...,0]
         w,h = diff.shape
         
-    rgb_diff = np.ones([3,w,h]) * 255
+    rgb_diff = torch.ones([3,w,h]) * 255
     diff[abs(diff)<thresh] = 0
     rgb_diff[0,...][diff>0] = 0
     rgb_diff[1,...][diff>0] = diff[diff>0]
