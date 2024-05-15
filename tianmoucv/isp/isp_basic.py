@@ -17,26 +17,28 @@ raw_awb = AutoWhiteBalance()
 def default_rgb_isp(raw, blc = 0, gamma = 0.9, raw_input = True):
     '''
     默认的RGB RAW数据处理流程
+    
     - 空洞填补
     - 去马赛克
     - 白平衡
-    - gamma
-    - blc
+    - 自适应降噪
+    - 自动饱和度
+    - 自动曲线
+    - 自动归一化
+
+    注意: 速度非常慢，仅供参考
     '''
     #fill hole
     if raw_input:
         raw = raw.astype(np.float32)
         raw = raw - blc
         raw[raw<0]=0
-
-        image_demosaic_withoutisp = exp_bayer_to_rgb_conv(raw)
-
         raw = lyncam_raw_comp(raw)
+        image_demosaic_withoutisp = exp_bayer_to_rgb_conv(raw)
         
         blc_avg = np.mean(blc)
         raw_after_awb = raw_awb(raw,method='GW',blc_avg=blc_avg)
         raw_after_awb[raw_after_awb>1023]=1023
-        
         #adjust gamma
         raw_gamma = (raw_after_awb/1024.0)**(1/gamma)*1024.0
 
@@ -52,6 +54,7 @@ def default_rgb_isp(raw, blc = 0, gamma = 0.9, raw_input = True):
     #adjust_curve
     #curve_factor = 0.02
     #image = adjust_curve(image,curve_factor)
+
     image = image_demosaic.astype(np.float32)
     
     return image/1024.0,image_demosaic_withoutisp/1024.0
@@ -71,6 +74,7 @@ def ACESToneMapping(color, adapted_lum=1):
     E = 0.14
     color *= adapted_lum
     return (color * (A * color + B)) / (color * (C * color + D) + E)
+
 
 
 # ===============================================================

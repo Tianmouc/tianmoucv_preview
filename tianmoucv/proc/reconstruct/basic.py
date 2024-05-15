@@ -53,20 +53,29 @@ def laplacian_blending_1c_batch(Ix,Iy,gray=None,iteration=50):
     # Return the blended image
     return lap_blend
 
+
+def smooth_edges(img):
+    # 自定义5x5 kernel
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+    # 开运算，先腐蚀再膨胀
+    opening = cv2.morphologyEx(img, cv2.MORPH_OPEN, kernel, iterations=1)
+    # 闭运算，先膨胀再腐蚀，使边缘更平滑
+    closing = cv2.morphologyEx(opening, cv2.MORPH_CLOSE, kernel, iterations=1)
+    # 使用高斯滤波进一步平滑边缘
+    blurred = cv2.GaussianBlur(closing, (5, 5), 0)
+    return blurred
+    
 def genMask(gray,th = 24, maxV=255, minV = 0):
     '''
     生成过欠曝区域遮罩
     '''
     gap = maxV- minV
-    mask_ts = ( (gray < (maxV-th)/gap) * (gray > (minV+th)/gap) ).float()
+    mask_ts = (gray < (maxV-th)/gap).float() #( (gray < (maxV-th)/gap) * (gray > (minV+th)/gap) ).float()
     mask_np = mask_ts.cpu().numpy()
     mask_np_b = (mask_np * gap).astype(np.uint8)
-    kernel = np.ones((5,5),np.uint8) * gap
-    kernel[0,4] = kernel[4,0] = kernel[4,4] = kernel[0,0] = 0
-    mask_np_b = cv2.erode(mask_np_b,kernel,iterations = 2)
-    mask_np_b = cv2.dilate(mask_np_b,kernel,iterations = 2)
-    mask_np = (mask_np_b>0.5)
-    return torch.Tensor(mask_np).to(gray.device).bool()
+    mask_np_b = smooth_edges(mask_np_b)
+    #mask_np = (mask_np_b>0.5)
+    return torch.Tensor(mask_np_b.).to(gray.device).float()/gap
 
 def laplacian_blending(Ix,Iy,srcimg=None, iteration=20, mask_rgb=False, mask_th = 24):
     '''
@@ -96,7 +105,7 @@ def laplacian_blending(Ix,Iy,srcimg=None, iteration=20, mask_rgb=False, mask_th 
         print('img shape:',srcimg.shape,' is illegal, [None],[H,W],[H,W,C] is supported')
 
     if mask_rgb and not result is None:
-        result[mask] = srcimg[mask]
+        result = result * mask +  srcimg * (1-mask)
         
     return result
 
@@ -147,7 +156,7 @@ def batch_inference(model,sample,
                 if t == 0 and b == 0:
                     td_batch[rawt,...] = 0
                 else:
-                    TD_0_t = torch.sum(tsdiff[:,0:1,1:t,...],dim=2)
+                    TD_0_t = tsdiff[:,0:1,1:t,...]
                     td = tdiff_split(TD_0_t,cdim=1)#splie pos and neg
                     td_batch[rawt,...] = td
 
@@ -159,7 +168,7 @@ def batch_inference(model,sample,
                     SD0_batch[rawt,...] = tsdiff[:,1:,-1,...]
                     SD1_batch[rawt,...] = tsdiff[:,1:,biast+t,...]
                     F_batch[rawt,...] = F1[:,:,biash:h+biash,biasw:w+biasw]
-                    TD_0_t = torch.sum(tsdiff[:,0:1,1:t,...],dim=2)
+                    TD_0_t = tsdiff[:,0:1,1:t,...]
                     td = tdiff_split(TD_0_t,cdim=1)#splie pos and neg
                     td_batch[rawt,...] = td
 
