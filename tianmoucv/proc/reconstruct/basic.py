@@ -75,7 +75,7 @@ def genMask(gray,th = 24, maxV=255, minV = 0):
     mask_np_b = (mask_np * gap).astype(np.uint8)
     mask_np_b = smooth_edges(mask_np_b)
     #mask_np = (mask_np_b>0.5)
-    return torch.Tensor(mask_np_b.).to(gray.device).float()/gap
+    return torch.Tensor(mask_np_b).to(gray.device).float()/gap
 
 def laplacian_blending(Ix,Iy,srcimg=None, iteration=20, mask_rgb=False, mask_th = 24):
     '''
