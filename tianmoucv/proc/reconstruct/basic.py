@@ -74,8 +74,8 @@ def genMask(gray,th = 24, maxV=255, minV = 0):
     mask_np = mask_ts.cpu().numpy()
     mask_np_b = (mask_np * gap).astype(np.uint8)
     mask_np_b = smooth_edges(mask_np_b)
-    #mask_np = (mask_np_b>0.5)
-    return torch.Tensor(mask_np_b).to(gray.device).float()/gap
+    mask_np = (mask_np_b>0.5)
+    return torch.Tensor(mask_np).to(gray.device).bool()
 
 def laplacian_blending(Ix,Iy,srcimg=None, iteration=20, mask_rgb=False, mask_th = 24):
     '''
@@ -105,7 +105,7 @@ def laplacian_blending(Ix,Iy,srcimg=None, iteration=20, mask_rgb=False, mask_th 
         print('img shape:',srcimg.shape,' is illegal, [None],[H,W],[H,W,C] is supported')
 
     if mask_rgb and not result is None:
-        result = result * mask +  srcimg * (1-mask)
+        result[mask] = srcimg[mask]
         
     return result
 
