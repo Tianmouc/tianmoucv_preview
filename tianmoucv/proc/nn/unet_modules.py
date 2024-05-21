@@ -134,7 +134,6 @@ class up(nn.Module):
         return x
 
 
-
 class Interp(nn.Module):
     def __init__(self, scale=None, size=None):
         super(Interp, self).__init__()
@@ -144,7 +143,6 @@ class Interp(nn.Module):
     def forward(self, x):
         y = F.interpolate(x, self.size, self.scale, mode='bilinear', align_corners=True)
         return y
-
 
 
 #############################

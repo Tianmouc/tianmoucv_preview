@@ -43,7 +43,7 @@ class TianmoucDataReader_basic():
                  training=True,
                  strict = True,
                  camera_idx= 0,
-                 rodfilepersample = 25):
+                 dark_level = None):
         self.print_info = print_info
 
         modedict = {0:'para',1:'lvds'}
@@ -56,9 +56,14 @@ class TianmoucDataReader_basic():
         self.sampleNumDict = dict([])
         self.sampleNum = 0
         self.EXT="tmdat"
-        
-        # a pack contain (RGB,N*TSD), N=25 for default usb module
-        self.rodfilepersample = rodfilepersample
+
+        self.blc = 0
+        if os.path.exists(dark_level):
+            if dark_level.split('.')[-1] == 'npz':
+                self.blc =  np.load(dark_level)['blc']
+            if dark_level.split('.')[-1] == 'npy':
+                self.blc =  np.load(dark_level)
+
         self.training = training
 
         # These buffers are used for fast data decoding
@@ -206,7 +211,6 @@ class TianmoucDataReader_basic():
         else:
             print('dataset_top:',dataset_top,' is not list or string')
 
-        #print(fileDict)
             
         keylist = [key for key in fileDict]
         # for each sample, extract all paired data id
@@ -224,7 +228,40 @@ class TianmoucDataReader_basic():
             coneFileRawFile = fileDict[key][self.pathways[1]]
             rodFileRawFile = fileDict[key][self.pathways[0]]
             systimeStamp = fileDict[key]['sysTimeStamp']
+            rodfilepersample = 25
+            
+            try:
+                rod_tmdat_path = '/'+os.path.join(*rodFileRawFile.split('/')[:-1])
+                rod_tmdat_path_list = os.listdir(rod_tmdat_path)
+                for meta_file_name in rod_tmdat_path_list:
+                    if meta_file_name.split('.')[-1]=='txt':
+                        with open(os.path.join(rod_tmdat_path,meta_file_name), mode='r', newline='') as file:
+                            lines = file.readlines()
+                            line = lines[1]
+                            # 提取第二行中的四个变量的值
+                            values = line.split(',')
+                            exp_time = int(values[0].split(':')[1].split(' ')[0].strip())
+                            gain = int(values[1].split(':')[1].strip())
+                            rod_mode = int(values[2].split(':')[1].strip())
+                            rod_adc_precision = int(values[3].split(':')[1].strip())
+    
+                            if rod_adc_precision == 8 and rod_mode == 0:
+                                rodfilepersample = 50
+                            if rod_adc_precision == 8 and rod_mode == 1:
+                                rodfilepersample = 25
+                            if rod_adc_precision == 4 and rod_mode == 0:
+                                rodfilepersample = 110
+                            if rod_adc_precision == 4 and rod_mode == 1:
+                                rodfilepersample = 50    
+                            if rod_adc_precision == 2 and rod_mode == 0:
+                                rodfilepersample = 330
+                            if rod_adc_precision == 2 and rod_mode == 1:
+                                rodfilepersample = 110
+            except:
+                #旧文件，默认都是25或者自适应读取
+                pass
 
+                                        
             rodTimeList = []
             coneTimeList = []
             rodcntList = []
@@ -276,7 +313,7 @@ class TianmoucDataReader_basic():
                 # check if satisfy the sample rate 
                 flag = False
                 if strict:
-                    flag = (ridx2 - ridx1 == self.rodfilepersample)
+                    flag = (ridx2 - ridx1 == rodfilepersample)
                 else:
                     flag = ridx2 > ridx1
                         
@@ -296,23 +333,13 @@ class TianmoucDataReader_basic():
                         
                     legalFileList.append(legalSample)
                 else:
+                    if self.print_info:
+                        print('recoreded rod:',ridx2 - ridx1,' expected:',rodfilepersample)
+                        print('if you wish to read all data neglecting data loss, set strict=False for datareader')
                     continue
-                    '''
-                        legalSample structur:
-                            legalSample['meta'] = {'key':key,
-                                               'C0':coneListSorted[coneID],
-                                               'C1':coneListSorted[coneID+1],
-                                               'R0':rodListSorted[rodRange[0]//self.rodfilepersample],
-                                               'R0_bias:':rodRange[0]%self.rodfilepersample,
-                                               'R1':rodListSorted[rodRange[0]//self.rodfilepersample],
-                                               'R1_bias:':rodRange[0]%self.rodfilepersample,
-                                               'C_time': (conetimestamp1,conetimestamp2),
-                                               'R_time': (rodtimestamp1,rodtimestamp2),
-                                               'C/R':self.aopcoprate,
-                                               'RpF':self.rodfilepersample}
-                        '''
+                    
             fileDict[key]['legalData'] = legalFileList
-            fileDict[key]['RpF'] = self.rodfilepersample
+            fileDict[key]['dataRatio'] = rodfilepersample
 
         return fileDict  
               
@@ -368,26 +395,25 @@ class TianmoucDataReader_basic():
         '''
         use the decoder and isp preprocess to generate a paired (RGB,n*TSD) sample dict:
         
-            sample['tsdiff_160x320'] = RAW TSD data ajusted to coorect space(with hollow)
-            sample['tsdiff'] = TSD data upsample to 320*640
-            sample['F0_raw'] = unprocessed raw data, 320*320, t=t_0
-            sample['F1_raw'] = unprocessed raw data, 320*320, t=t_0
-            sample['F0_without_isp'] = only demosaced frame data, 3*320*640, t=t_0
-            sample['F1_without_isp'] = only demosaced frame data, 3*320*640, t=t_0
-            sample['F0_HDR']: RGB+SD Blended HDR frame data, 3*320*640, t=t_0
-            sample['F1_HDR']: RGB+SD Blended HDR frame data, 3*320*640, t=t_0+33ms
-            sample['F0']: preprocessed frame data, 3*320*640, t=t_0
-            sample['F1']: preprocessed frame data, 3*320*640, t=t_0+33ms
-            sample['rawDiff']: raw TSD data, N*3*160*160, from t=t_0 to t=t+33ms
-            sample['meta']: path infomation and and timestamps for each data
-            sample['labels']: list of labels, if you have one
-            sample['sysTimeStamp']: system time stamp in us, use for multi-sensor sync
-        '''
+            - sample['tsdiff'] = TSD data upsample to 320*640
+            - sample['rawDiff']: raw TSD data, N*3*160*160, from t=t_0 to t=t+ T ms (T=33 in 757 @ 8 bit  mode)
+            - sample['F0_without_isp'] = only demosaced frame data, 3*320*640, t=t_0
+            - sample['F1_without_isp'] = only demosaced frame data, 3*320*640, t=t_0
+            - sample['F0_HDR']: RGB+SD Blended HDR frame data, 3*320*640, t=t_0
+            - sample['F1_HDR']: RGB+SD Blended HDR frame data, 3*320*640, t=t_0+T ms
+            - sample['F0']: preprocessed frame data, 3*320*640, t=t_0
+            - sample['F1']: preprocessed frame data, 3*320*640, t=t_0+T ms
+            - sample['meta']: path infomation and and timestamps for each data
+            - sample['labels']: list of labels, if you have one
+            - sample['sysTimeStamp']: system time stamp in us, use for multi-sensor sync
+        '''       
         sample = dict([])
         metaInfo = dict([])
         legalSample = self.fileDict[key]['legalData'][idx]
         conefilename = self.fileDict[key][self.pathways[1]]
         rodfilename  = self.fileDict[key][self.pathways[0]]
+        dataRatio = self.fileDict[key]['dataRatio']
+        
         coneAddrs = legalSample[self.pathways[1]]
         rodAddrs = legalSample[self.pathways[0]]
         
@@ -428,7 +454,7 @@ class TianmoucDataReader_basic():
             
         if needPreProcess:
             start_frame,end_frame,tsdiff_inter,F0_without_isp,F1_without_isp  = self.preprocess(start_frame_raw,end_frame_raw,tsd)
-            sample['tsdiff_160x320'] = tsdiff_inter
+            #sample['tsdiff_160x320'] = tsdiff_inter
             tsdiff_resized = F.interpolate(tsdiff_inter,(320,640),mode='bilinear')
             sample['tsdiff'] = tsdiff_resized
             sample['F0_without_isp'] = F0_without_isp
@@ -441,6 +467,7 @@ class TianmoucDataReader_basic():
         sample['meta'] = metaInfo
         sample['labels'] = legalSample['labels']
         sample['sysTimeStamp'] = legalSample['sysTimeStamp']
+        sample['dataRatio']= dataRatio
         return sample
     
     def HDRRecon(self,SD,F0):
@@ -448,7 +475,7 @@ class TianmoucDataReader_basic():
         HDR fusion
         '''
         F0 = torch.Tensor(F0)
-        Ix,Iy= SD2XY(SD)
+        Ix,Iy= SD2XY(SD)#0-1
         Ix = F.interpolate(torch.Tensor(Ix).unsqueeze(0).unsqueeze(0), size=(320,640), mode='bilinear').squeeze(0).squeeze(0)
         Iy = F.interpolate(torch.Tensor(Iy).unsqueeze(0).unsqueeze(0), size=(320,640), mode='bilinear').squeeze(0).squeeze(0)
         blend_hdr = laplacian_blending(-Ix,-Iy, srcimg=F0, iteration=20, mask_rgb=True, mask_th = 32)
@@ -459,8 +486,8 @@ class TianmoucDataReader_basic():
         use isp in TIANMOUCV
         '''
         ts = time.time()
-        F0,F0_without_isp = default_rgb_isp(F0_raw,origin_demosaic=False)
-        F1,F1_without_isp = default_rgb_isp(F1_raw,origin_demosaic=False)
+        F0,F0_without_isp = default_rgb_isp(F0_raw,blc=self.blc)
+        F1,F1_without_isp = default_rgb_isp(F1_raw,blc=self.blc)
         te1 = time.time()
         tsdiff_inter = self.upsampleTSD_conv(tsdiff)/128.0
         te2 = time.time()

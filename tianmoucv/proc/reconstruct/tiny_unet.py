@@ -14,16 +14,14 @@ from tianmoucv.proc.nn.utils import tdiff_split
 
 class TianmoucRecon_tiny(nn.Module):
     '''
-    重建网络
-    权重链接:https://cloud.tsinghua.edu.cn/f/2baddb35cc034d31956e/?dl=1
-    old:https://cloud.tsinghua.edu.cn/f/9d4adcfa7f0245959747/?dl=1
+    重建网络 updated direct 2024-05-15
     '''
     def __init__(self,ckpt_path =None,_optim=True):
         super(TianmoucRecon_tiny, self).__init__()
         current_dir=os.path.dirname(__file__)
         
         if ckpt_path is None:
-            ckpt_path = 'https://cloud.tsinghua.edu.cn/f/2baddb35cc034d31956e/?dl=1'
+            ckpt_path = 'https://cloud.tsinghua.edu.cn/f/dcbaea7004854939b5ec/?dl=1'
         self.reconNet =  UNetRecon(7, 3)
         status = check_url_or_local_path(ckpt_path)
         print('loading..:',ckpt_path)
@@ -86,7 +84,7 @@ class TianmoucRecon_tiny(nn.Module):
         tsdiff = tsdiff.unsqueeze(0).to(self.device)
             
         SD1 = tsdiff[:,1:,t,...]
-        TD_0_t = torch.sum(tsdiff[:,0:1,1:t,...],dim=2)
+        TD_0_t = tsdiff[:,0:1,1:t,...]
         
         TD_0_t = tdiff_split(TD_0_t,cdim=1)#splie pos and neg
 
@@ -119,7 +117,7 @@ class TianmoucRecon_tiny(nn.Module):
 
         TD_0_t_b = torch.zeros([n2,2,h,w]).to(self.device)
         for n in range(1,n2):
-            td_ = torch.sum(tsdiff[:,0:1,1:n+1,...],dim=2)
+            td_ = tsdiff[:,0:1,1:n+1,...]
             td = tdiff_split(td_,cdim=1)
             TD_0_t_b[n:n+1,...] = td
         
