@@ -13,5 +13,4 @@ __author__ = 'Y. Lin'
 __contributor__ = 'T. Wang, Y. Chen'
 __authorEmail__ = '532109881@qq.com'
 
-
 print('TianMouCV™ 0.3.2, via',__author__,' updated on 2024-05-21, new NN ckpts, new isp')
