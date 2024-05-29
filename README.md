@@ -8,7 +8,7 @@
 
 This is the Python tool for the first complementary vision sensor (CVS), TianMouC.
 
-More details about the project can be found on our project page. [Tianmouc Project](https://www.cbicr.tsinghua.edu.cn/?page_id=971) and [TianmoucvProject](http://www.tianmouc.cn:40000/tianmoucv/introduction.html)
+More details about the project can be found on our project page. [Tianmouc Project](http://www.tianmouc.com:40000) and [TianmoucvProject](http://www.tianmouc.cn:40000/tianmoucv/introduction.html)
 ## Installation
 
 (0) Prepare pytorch environment
