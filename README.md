@@ -70,7 +70,6 @@ Including:
 
 (5) data reeader
 
-...
 
 These samples can be directly run on jupyter notebook
 
@@ -80,3 +79,16 @@ pip install jupyter notebook
 jupyter notebook
 ```
 
+## Maintainers
+
+[@lyh983012](https://github.com/lyh983012).
+
+
+### Contributors
+
+This project exists thanks to all the people who contribute. 
+<a href="https://github.com/Tianmouc/tianmoucv_preview/graphs/contributors"><img src="https://opencollective.com/tianmoucv_preview/contributors.svg?width=890&button=false" /></a>
+
+## License
+
+[GPLv3](LICENSE) © Yihan Lin
