@@ -24,7 +24,7 @@ class TianmoucOF_SpyNet(nn.Module):
 
     '''
     #temp network
-    def __init__(self,imgsize,ckpt_path = None):
+    def __init__(self,imgsize,ckpt_path = None, _optim=True):
         super(TianmoucOF_SpyNet, self).__init__()
         current_dir=os.path.dirname(__file__)
         
@@ -61,7 +61,7 @@ class TianmoucOF_SpyNet(nn.Module):
             param.requires_grad = False
             
         main_version = int(torch.__version__[0])
-        if main_version==2:
+        if main_version==2 and _optim:
             print('compiling model for pytorch version>= 2.0.0')
             self.flowComp = torch.compile(self.flowComp)
             print('compiled!')

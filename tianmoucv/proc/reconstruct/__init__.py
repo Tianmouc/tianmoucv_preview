@@ -4,6 +4,8 @@ from .basic import laplacian_blending,batch_inference,laplacian_blending_1c_batc
 
 from .integration import TD_integration,SD_integration
 
+from .fuse_net import TianmoucRecon_mem
+
 from .tiny_unet import TianmoucRecon_tiny
 
 

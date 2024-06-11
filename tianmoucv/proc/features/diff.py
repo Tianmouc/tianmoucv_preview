@@ -106,7 +106,7 @@ def HarrisCorner(Ix:torch.Tensor,Iy:torch.Tensor,k = 0.1,th = 0.5,size=5,sigma=1
     threshold =  float(torch.max(R)) * th
     R_Max = F.max_pool2d(R.unsqueeze(0).unsqueeze(0), kernel_size=nmsSize, 
                              stride=1, padding=nmsSize//2).squeeze(0).squeeze(0)
-    idmap = (R >= threshold).int() * (R > R_Max-1e-5).int()
+    idmap = (R >= threshold).int() * (R > R_Max*0.999).int()
     R = R[idmap>0]
         
     return idmap,R
@@ -151,7 +151,7 @@ def TomasiCorner(Ix:torch.Tensor, Iy:torch.Tensor, index=1000,size=5,sigma=2,nms
     threshold = sorted_[0,index]
     R_Max = F.max_pool2d(R.unsqueeze(0).unsqueeze(0), kernel_size=nmsSize, 
                              stride=1, padding=nmsSize//2).squeeze(0).squeeze(0)
-    idmap = (R >= threshold).int() * (R > R_Max-1e-5).int()
+    idmap = (R >= threshold).int() * (R > R_Max*0.999).int()
     return idmap,R
 
 

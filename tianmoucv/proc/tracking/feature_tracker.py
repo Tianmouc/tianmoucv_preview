@@ -1,6 +1,6 @@
 import numpy as np
 import cv2
-
+from scipy.optimize import linear_sum_assignment
 
 # ===============================================================
 # ******描述子匹配****** 
@@ -79,7 +79,7 @@ def align_images(image, kpList1, kpList2,matches, canvas=None):
         y2 , x2 = int(dst_pts[i][0][0]),int(dst_pts[i][0][1])
         if canvas is not None:
             cv2.line(canvas,(x1,y1),(x2+640,y2),(255,0,0))
-        print(x1,',',y1,'---',x2,',',y2)
+        print(x1,',',y1,'--->',x2,',',y2)
     w,h = image.shape[1],image.shape[0]
     
     imagewp = image
