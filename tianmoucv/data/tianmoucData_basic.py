@@ -12,7 +12,7 @@ except:
 
 #用于重建
 #用于rgb的ISP
-from tianmoucv.proc.reconstruct import laplacian_blending
+from tianmoucv.proc.reconstruct import poisson_blending
 from tianmoucv.isp import default_rgb_isp,SD2XY,ACESToneMapping
 
 from ctypes import *
@@ -21,14 +21,13 @@ flag = True
 
 class TianmoucDataReader_basic():
     '''
+    This is the basic class to parse the data
         - path: string或者string的列表，会自动扫描其下所有的tmdat sample
         - showList:是否打印信息
         - MAXLEN:每个sample的最大长度，防止超长sample干扰训练
         - matchkey:是否匹配某个sample name
         - cachePath:缓存目录，None则每次重新构建数据集
         - ifcache:是否存下所有数据的地址，方便大规模数据集下次读取
-        - speedUpRate:数据稀疏采样
-                *这部分处理不会被存储
         输出数据是F0,F1,...,FN，F0_HDR,F1_HDR,...,FN_HDR，以及25*N*speedUpRate 帧ROD 连续
         存储在一个字典里，上述名称为key
     '''
@@ -56,6 +55,14 @@ class TianmoucDataReader_basic():
         self.sampleNumDict = dict([])
         self.sampleNum = 0
         self.EXT="tmdat"
+
+        if not matchkey is None:
+            if isinstance(matchkey, str):
+                matchkey = [matchkey]
+            elif isinstance(matchkey, list):
+                pass 
+            else:
+                raise TypeError("The matchkey must be either a string or a list.")
 
         self.blc = 0
         if os.path.exists(dark_level):
@@ -153,7 +160,8 @@ class TianmoucDataReader_basic():
                     sample_name = sp_top_path[-1]
                     sample_key = sample_name+'@'+dataset_top
                     us_value = 0
-                    if (matchkey is None) or sample_name == matchkey:
+
+                    if (matchkey is None) or sample_name in matchkey:
                         for pw in self.pathways:
                             pw_path = os.path.join(top_path, pw)
                             raw_file_list = os.listdir(pw_path)
@@ -161,13 +169,13 @@ class TianmoucDataReader_basic():
                             for file in raw_file_list:
                                 if file.split('.')[-1]=='tmdat':
                                     tmdat_file_list.append(file)
-                                    
                                 #临时的处理方案，用系统时间戳做对齐
                                 try:
                                     if pw == self.pathways[1] and file.split('.')[-1]=='txt':
                                         extra_info_path = os.path.join(pw_path, file)
                                         with open(extra_info_path, 'r') as txtfile:
                                             first_line = txtfile.readline()
+                                            first_line = first_line.split(':')[-1]
                                             first_line = first_line.replace('us', '')
                                             first_line = first_line.replace('s', '')
                                             first_line = first_line.replace(',', '')
@@ -191,7 +199,7 @@ class TianmoucDataReader_basic():
     def addMoreSample(self,fileDict,dataset_top, matchkey=None, strict = True, camera_idx= 0):
         '''
         scan one sample to generate a sync-ed (RGB_n,RGB_{n+1},TSD_n,TSD_{n+m}) pair list
-        @dataset_top: 数据集顶层路径
+        @dataset_top: 
         dataset_top
             - sample 1
             - sample 2
@@ -395,18 +403,29 @@ class TianmoucDataReader_basic():
         '''
         use the decoder and isp preprocess to generate a paired (RGB,n*TSD) sample dict:
         
-            - sample['tsdiff'] = TSD data upsample to 320*640
-            - sample['rawDiff']: raw TSD data, N*3*160*160, from t=t_0 to t=t+ T ms (T=33 in 757 @ 8 bit  mode)
-            - sample['F0_without_isp'] = only demosaced frame data, 3*320*640, t=t_0
-            - sample['F1_without_isp'] = only demosaced frame data, 3*320*640, t=t_0
-            - sample['F0_HDR']: RGB+SD Blended HDR frame data, 3*320*640, t=t_0
-            - sample['F1_HDR']: RGB+SD Blended HDR frame data, 3*320*640, t=t_0+T ms
-            - sample['F0']: preprocessed frame data, 3*320*640, t=t_0
-            - sample['F1']: preprocessed frame data, 3*320*640, t=t_0+T ms
-            - sample['meta']: path infomation and and timestamps for each data
-            - sample['labels']: list of labels, if you have one
-            - sample['sysTimeStamp']: system time stamp in us, use for multi-sensor sync
-        '''       
+            - COP
+                - COP is stored seprately as F0，F1，F2 ... FN+1, use string key to get them
+                - COP's framerate is 30.3fps
+                - i = 0~N
+                - sample['Fi_without_isp'] = only demosaced frame data, without addtional isp 3*320*640, t=t_0+i*T
+                - sample['Fi_HDR']: RGB+SD Blended HDR frame data, 3*320*640, t=t_0+i*T ms
+                - sample['Fi']: preprocessed frame data, 3*320*640, t=t_0+i*T ms
+            - AOP
+                - AOP data is stored in a large tensor, [T,C,H,W]
+                - channel 0 is TD, channel 1 is SDL, channel 2 is SDR
+                - sample['tsdiff'] = TSD data upsample to (N+1)*3*320*640, from t=t_0 to t=t+ N*T ms (eg. T=33 in 757 @ 8 bit  mode)
+                - sample['rawDiff']: raw TSD data, (N+1)*3*160*160, from t=t_0 to t=t+ N*T ms (eg. T=33 in 757 @ 8 bit  mode)
+                - all tianmoucv API use sample['rawDiff'] for input, sample['tsdiff'] is used by some NN-based method
+            - sample['meta']: 
+                - a dict
+                - file path infomation 
+                - camera timestamps for each data
+                - more other details
+            - sample['labels']: 
+                - list of labels, if you have one
+            - sample['sysTimeStamp']: unix system time stamp in us, use for multi-sensor sync, -1 if not supported
+                - you can calculate Δt = sysTimeStamp1-sysTimeStamp2, unit is 'us'
+        '''   
         sample = dict([])
         metaInfo = dict([])
         legalSample = self.fileDict[key]['legalData'][idx]
@@ -478,7 +497,7 @@ class TianmoucDataReader_basic():
         Ix,Iy= SD2XY(SD)#0-1
         Ix = F.interpolate(torch.Tensor(Ix).unsqueeze(0).unsqueeze(0), size=(320,640), mode='bilinear').squeeze(0).squeeze(0)
         Iy = F.interpolate(torch.Tensor(Iy).unsqueeze(0).unsqueeze(0), size=(320,640), mode='bilinear').squeeze(0).squeeze(0)
-        blend_hdr = laplacian_blending(-Ix,-Iy, srcimg=F0, iteration=20, mask_rgb=True, mask_th = 32)
+        blend_hdr = poisson_blending(Ix,Iy, srcimg=F0, iteration=20, mask_rgb=True, mask_th = 32)
         return blend_hdr
     
     def preprocess(self,F0_raw,F1_raw,tsdiff):
