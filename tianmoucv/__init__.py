@@ -14,4 +14,4 @@ __contributor__ = 'T. Wang, Y. Chen'
 __authorEmail__ = '532109881@qq.com'
 
 
-print('TianMouCV™ 0.3.2.2, via',__author__,' update new gray reconstruction method and better data reader')
+print('TianMouCV™ 0.3.2.3, via',__author__,' fix tmdat decoder for large file and slightly decrepted file')

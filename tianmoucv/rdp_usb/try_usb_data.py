@@ -7,9 +7,9 @@ import torch
 import rod_decoder_py as rdc
 import time
 
-dataset_path = "/data/taoyi/dataset/Lyncam/usb_test"
-rod_data_path = os.path.join(os.path.join(dataset_path, "rod"), "tianmouc_raw_data_32358340783.bin")
-cone_data_path = os.path.join(os.path.join(dataset_path, "cone"), "tianmouc_raw_data_32358343789.bin")
+dataset_path = "/data/taoyi/dataset/Tianmouc/test/good1"
+rod_data_path = os.path.join(os.path.join(dataset_path, "rod"), "tianmouc_raw_data_694351.tmdat")
+cone_data_path = os.path.join(os.path.join(dataset_path, "cone"), "tianmouc_raw_data_689450.tmdat")
 
 rod_img_per_file = 1
 rod_width = 160

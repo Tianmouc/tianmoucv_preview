@@ -1179,11 +1179,21 @@ std::vector<uint64_t> usbfmt_contruct_frm_list(const std::string &fpath, py::lis
         int radc_prec;
         usb_header_parse(pval_head, &timestamp, &fcnt, &radc_prec);
         frame_size = pval_head[6] & 0xffffff;
-        //printf("%lx,%x,%x,%x, %d\n ", timestamp, fcnt, radc_prec, frame_size, fnum);
+        if((timestamp == 0 || fcnt ==0) && fnum > 2){
+            printf("read some zero data, break\n");
+            break;
+        }
+        // for(int i = 0; i < 16; i++){
+        //     printf("%x ", pval_head[i]);
+        // }
+        // printf("\n");
+        // printf("%lx,%x,%x,%x, %d\n ", timestamp, fcnt, radc_prec, frame_size, fnum);
+        
         timestamp_list.append(timestamp);
         fcnt_list.append(fcnt);
         frm_start_Ptrlist.push_back(readstart_ptr);
         readstart_ptr = frame_size * 4 + readstart_ptr;
+        
         frm_num ++;
     }
     fin.close();
