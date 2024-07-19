@@ -8,7 +8,7 @@ flag = True
 try:
     from tianmoucv.rdp_usb import rod_decoder_py as rdc
 except:
-    print("WARNING: no decoder found, try to compile under ./rod_decoder_py")
+    print("WARNING: no decoder found, try to compile it under ./rod_decoder_py")
     current_file_path = os.path.abspath(__file__)
     parent_folder_path = os.path.dirname(os.path.dirname(current_file_path))
     aim_path = os.path.join(parent_folder_path,'rdp_usb')
@@ -18,6 +18,8 @@ except:
     subprocess.run(['sh', './compile_pybind.sh'])
     from tianmoucv.rdp_usb import rod_decoder_py as rdc
     print('compile decoder successfully')
+    print('If you still get this message,please try:\n 1. run it in a python script (only once) \n 2. use source code install to see what happened')
+  
     
 #用于重建
 from tianmoucv.proc.reconstruct import poisson_blending
@@ -77,7 +79,7 @@ class TianmoucDataReader(TianmoucDataReader_basic):
                  training=True,
                  strict = True,
                  use_data_parser = False,
-                 dark_level = os.path.dirname(os.path.abspath(__file__))+'/blc/camera605.npz'):
+                 dark_level = 0):
         
         self.N = N
         self.use_data_parser = use_data_parser

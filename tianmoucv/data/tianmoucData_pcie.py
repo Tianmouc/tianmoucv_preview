@@ -25,10 +25,11 @@ except:
     subprocess.run(['sh', './compile_pybind.sh'])
     from tianmoucv.rdp_pcie import rod_decoder_py as rdc
     print('compile decoder successfully')
-
+    print('If you still get this message,please try:\n 1. run it in a python script (only once) \n 2. use source code install to see what happened')
+  
     
 #用于色彩调整
-from tianmoucv.isp import fourdirection2xy,default_rgb_isp
+from tianmoucv.isp import SD2XY,default_rgb_isp
 from tianmoucv.proc.reconstruct import laplacian_blending
 
 adc_bit_prec = 8
@@ -519,7 +520,7 @@ class TianmoucDataReader_pcie():
     
     def HDRRecon(self,SD,F0):
         F0 = torch.Tensor(F0)
-        Ix,Iy= fourdirection2xy(SD)
+        Ix,Iy= SD2XY(SD)
         Ix = F.interpolate(torch.Tensor(Ix).unsqueeze(0).unsqueeze(0), size=(320,640), mode='bilinear').squeeze(0).squeeze(0)
         Iy = F.interpolate(torch.Tensor(Iy).unsqueeze(0).unsqueeze(0), size=(320,640), mode='bilinear').squeeze(0).squeeze(0)
         blend_hdr = laplacian_blending(-Ix,-Iy, srcimg=F0,iteration=20, mask_rgb=True)

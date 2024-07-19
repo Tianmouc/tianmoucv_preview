@@ -42,7 +42,7 @@ class TianmoucDataReader_basic():
                  training=True,
                  strict = True,
                  camera_idx= 0,
-                 dark_level = None):
+                 dark_level = 0):
         self.print_info = print_info
 
         modedict = {0:'para',1:'lvds'}
@@ -65,11 +65,14 @@ class TianmoucDataReader_basic():
                 raise TypeError("The matchkey must be either a string or a list.")
 
         self.blc = 0
-        if os.path.exists(dark_level):
-            if dark_level.split('.')[-1] == 'npz':
-                self.blc =  np.load(dark_level)['blc']
-            if dark_level.split('.')[-1] == 'npy':
-                self.blc =  np.load(dark_level)
+        if isinstance(dark_level,str):
+            if os.path.exists(dark_level):
+                if dark_level.split('.')[-1] == 'npz':
+                    self.blc =  np.load(dark_level)['blc']
+                if dark_level.split('.')[-1] == 'npy':
+                    self.blc =  np.load(dark_level)
+        elif isinstance(dark_level,np.ndarray):
+            self.blc = dark_level
 
         self.training = training
 
