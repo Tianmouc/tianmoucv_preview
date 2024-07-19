@@ -9,7 +9,7 @@ with open("./README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name='tianmoucv',                     # 模块的名称
-    version='0.3.3.0',                      # 版本号
+    version='0.3.3.0.1',                      # 版本号
     author='Yihan Lin,Taoyi Wang',        # 作者名称
     author_email='532109881@qq.com',      # 作者邮箱
     description='Algorithms library for Tianmouc sensor',   # 简要描述
