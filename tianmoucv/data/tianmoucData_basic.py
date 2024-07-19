@@ -372,6 +372,9 @@ class TianmoucDataReader_basic():
         '''
         AOP/ROD/TD+SD decoding
         '''
+        self.temp_diff_np*=0
+        self.spat_diff_left_np*=0
+        self.spat_diff_right_np*=0
         ret_code = rdc.get_one_rod_fullinfo(rodFileRawFile, startAddr,
                                                             self.temp_diff_np, 
                                                             self.spat_diff_left_np, 
