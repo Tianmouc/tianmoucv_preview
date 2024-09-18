@@ -29,7 +29,7 @@ class TianmoucOF_SpyNet(nn.Module):
         current_dir=os.path.dirname(__file__)
         
         if ckpt_path is None:
-            ckpt_path = 'https://cloud.tsinghua.edu.cn/f/84ac6e32060443e2975d/?dl=1'
+            ckpt_path = 'http://www.tianmouc.cn:38328/index.php/s/LC8xEj3HrmeyA9Y/download/of_0918_ver_best.ckpt'
         status = check_url_or_local_path(ckpt_path)
         print('loading..:',ckpt_path)
         if status == 1:

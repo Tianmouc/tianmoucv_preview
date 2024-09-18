@@ -14,4 +14,4 @@ __contributor__ = 'T. Wang, Y. Chen'
 __authorEmail__ = '532109881@qq.com'
 
 
-print('TianMouCV™ 0.3.3.0, via',__author__,'add single tmdat reader, fix a fatal bug in datareader_rod')
+print('TianMouCV™ 0.3.3.1, via',__author__,'fix ckpts download bug')
