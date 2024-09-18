@@ -21,7 +21,7 @@ class TianmoucRecon_tiny(nn.Module):
         current_dir=os.path.dirname(__file__)
         
         if ckpt_path is None:
-            ckpt_path = 'https://cloud.tsinghua.edu.cn/f/dcbaea7004854939b5ec/?dl=1'
+            ckpt_path = 'https://cloud.tsinghua.edu.cn/f/6c5e4e900a834b85bfc6/?dl=1'
         self.reconNet =  UNetRecon(7, 3)
         status = check_url_or_local_path(ckpt_path)
         print('loading..:',ckpt_path)
