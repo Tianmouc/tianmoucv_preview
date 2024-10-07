@@ -108,37 +108,17 @@ def make_color_wheel():
 
 # ===============================================================
 # 光流uv to RGB
+# from EV
 # ===============================================================
 def flow_to_image(flow:np.array):
-    """
-    Convert flow into middlebury color code image
-    :param flow: optical flow map
-    :return: optical flow image in middlebury color
-    """
-    u = flow[:, :, 0]
-    v = flow[:, :, 1]
-    maxu = -999.
-    maxv = -999.
-    minu = 999.
-    minv = 999.
-    UNKNOWN_FLOW_THRESH = 1e7
-    SMALLFLOW = 0.0
-    LARGEFLOW = 1e8
-    idxUnknow = (abs(u) > UNKNOWN_FLOW_THRESH) | (abs(v) > UNKNOWN_FLOW_THRESH)
-    u[idxUnknow] = 0
-    v[idxUnknow] = 0
-    maxu = max(maxu, np.max(u))
-    minu = min(minu, np.min(u))
-    maxv = max(maxv, np.max(v))
-    minv = min(minv, np.min(v))
-    rad = np.sqrt(u ** 2 + v ** 2)
-    maxrad = max(-1, np.max(rad))
-    u = u/(maxrad + np.finfo(float).eps)
-    v = v/(maxrad + np.finfo(float).eps)
-    img = compute_color(u, v)
-    idx = np.repeat(idxUnknow[:, :, np.newaxis], 3, axis=2)
-    img[idx] = 0
-    return np.uint8(img)
+    h, w = flow.shape[:2]
+    hsv = np.zeros((h, w, 3), dtype=np.uint8)
+    mag, ang = cv2.cartToPolar(flow[..., 0], flow[..., 1])
+    hsv[..., 0] = ang * 180 / np.pi / 2
+    hsv[..., 1] = 255
+    hsv[..., 2] = cv2.normalize(mag, None, 0, 255, cv2.NORM_MINMAX)
+    bgr = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+    return bgr
 
 # ===============================================================
 # 利用uv输入做变形
