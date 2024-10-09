@@ -33,11 +33,10 @@ class TianmoucDataReader_basic():
     '''
     def __init__(self,path,showList=True,
                  MAXLEN=-1,
+                 uniformSampler = True,
                  matchkey=None,
                  cachePath=None,
                  ifcache = False, 
-                 speedUpRate=1,
-                 ifUniformSampling = False,
                  print_info=True,
                  training=True,
                  strict = True,
@@ -72,6 +71,7 @@ class TianmoucDataReader_basic():
                 if dark_level.split('.')[-1] == 'npy':
                     self.blc =  np.load(dark_level)
         elif isinstance(dark_level,np.ndarray):
+            print('dark_level_average:',np.mean(dark_level))
             self.blc = dark_level
 
         self.training = training
@@ -113,8 +113,8 @@ class TianmoucDataReader_basic():
                 print('making cache file...')
                 np.save(cachePath, self.fileDict)
         
-        #Scan all samples to generate a file list, use speedUpRate to control the sparsity
-        self.extraction(speedUpRate,MAXLEN,ifUniformSampling)
+        #Scan all samples to generate a file list, use to control the sparsity
+        self.extraction(MAXLEN,uniformSampler)
             
         # print the dataset information
         for key in self.fileDict:
@@ -355,16 +355,20 @@ class TianmoucDataReader_basic():
         return fileDict  
               
     
-    def extraction(self,rate,MAXLEN,ifUniformSampling):
+    def extraction(self,MAXLEN,uniformSampler):
         '''
         cut the MAXLEN
         '''
-        print('>>> @rate paramter is not implemented in thie version')
+        print('>>> YOU ARE USING ORIGINAL VERSION')
         for key in self.fileDict:
             if self.print_info:
                 legalFileList = self.fileDict[key]['legalData'] 
-                if len(self.fileDict[key]['legalData'])>MAXLEN:
-                    self.fileDict[key]['legalData']  = self.fileDict[key]['legalData'][:MAXLEN]
+                if MAXLEN > 0 :
+                    adptiverate = len(legalFileList)//MAXLEN
+                    if uniformSampler:
+                        self.fileDict[key]['legalData']  = [legalFileList[i] for i in range(0, len(legalFileList), adptiverate)]
+                    else:
+                        self.fileDict[key]['legalData']  = legalFileList[:MAXLEN]
 
 
     # read a rod file directly
@@ -472,10 +476,9 @@ class TianmoucDataReader_basic():
             tsd[0,i,:,:] = torch.Tensor(td.astype(np.float32)).view(self.rod_height,self.rod_width)
             tsd[1,i,:,:] = torch.Tensor(sdl.astype(np.float32)).view(self.rod_height,self.rod_width)
             tsd[2,i,:,:] = torch.Tensor(sdr.astype(np.float32)).view(self.rod_height,self.rod_width)
-            if i == 0:
-                SD_0 = tsd[1:,i,...]
-            if i == itter - 1:
-                SD_1 = tsd[1:,i,...]
+
+        SD_0 = tsd[1:,0,...]
+        SD_1 = tsd[1:,itter - 1,...]
             
         if needPreProcess:
             start_frame,end_frame,tsdiff_inter,F0_without_isp,F1_without_isp  = self.preprocess(start_frame_raw,end_frame_raw,tsd)
@@ -486,6 +489,7 @@ class TianmoucDataReader_basic():
             sample['F1_without_isp'] = F1_without_isp
             sample['F0_HDR'] = self.HDRRecon(SD_0/128.0,start_frame)
             sample['F1_HDR'] = self.HDRRecon(SD_1/128.0,end_frame)
+            
         sample['F0'] = start_frame
         sample['F1'] = end_frame
         sample['rawDiff'] = tsd
@@ -529,7 +533,7 @@ class TianmoucDataReader_basic():
         tsdiff_expand[...,::2,::2] = tsdiff[...,::2,:]
         tsdiff_expand[...,1::2,1::2] = tsdiff[...,1::2,:]
         channels, T, height, width = tsdiff_expand.size()
-        input_tensor = tsdiff_expand.view(channels*T, height, width).unsqueeze(0)
+        input_tensor = tsdiff_expand.view(channels*T, height, width).unsqueeze(1)
         # 定义卷积核
         kernel = torch.zeros(1, 1, 3, 3)
         kernel[:, :, 1, 0] = 1/4
@@ -544,12 +548,12 @@ class TianmoucDataReader_basic():
         # 将卷积结果填充回原tensor
         for c in range(channels*T):
             #print(padded_tensor[0,:8,:8])
-            output = F.conv2d(padded_tensor[:,c:c+1,...], kernel, padding=0)
+            output = F.conv2d(padded_tensor[c:c+1,:,...], kernel, padding=0)
             #print(output[0,:8,:8])
-            output_tensor[:, c:c+1, 0:-1:2, 1:-1:2] = output[:, :, 0:-1:2, 1:-1:2]
-            output_tensor[:, c:c+1, 1:-1:2, 0:-1:2] = output[:, :, 1:-1:2, 0:-1:2]
+            output_tensor[c:c+1,: , 0:-1:2, 1:-1:2] = output[:, :, 0:-1:2, 1:-1:2]
+            output_tensor[c:c+1,: , 1:-1:2, 0:-1:2] = output[:, :, 1:-1:2, 0:-1:2]
             #print(output_tensor[0,:8,:8])
-        return output_tensor[0,...].view(channels, T, height, width)
+        return output_tensor[:,0,...].view(channels, T, height, width)
 
     
     def dataNum(self,key):

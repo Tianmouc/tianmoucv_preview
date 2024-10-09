@@ -10,8 +10,8 @@ import sys
 # __init__.py
 __all__ = ['random', 'cv2', 'math', 'torch','os','sys']
 __author__ = 'Y. Lin'
-__contributor__ = 'T. Wang, Y. Chen'
+__contributor__ = 'T. Wang, Y. Chen, Y. Li'
 __authorEmail__ = '532109881@qq.com'
 
 
-print('TianMouCV™ 0.3.3.1, via',__author__,'fix ckpts download bug')
+print('TianMouCV™ 0.3.3.2, via',__author__,' Yuxiang Li add denoise api')
