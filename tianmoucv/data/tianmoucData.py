@@ -112,8 +112,8 @@ class TianmoucDataReader(TianmoucDataReader_basic):
             print('[datareader]Customising aop_denoise_args using tianmoucv.data.denoise_utils.denoise_defualt_args()')
             print('[datareader]Better to provide:{\'TD\':[np.array]*2,\'SDL\':[np.array]*2,\'SDR\':[np.array]*2}')
             self.aop_denoise_args.print_info()
-            self.td_fpn_calibration_(Num=min(50,self.__len__()))
-            self.sd_fpn_calibration_(Num=min(50,self.__len__()))
+            self.td_fpn_calibration_(Num=min(50,self.__len__()-1))
+            self.sd_fpn_calibration_(Num=min(50,self.__len__()-1))
             print('[datareader]calibration done')
             print('[datareader]Warning: AOP denoise is an experimental function,and haven\'t been used in nn training')
             print('[datareader]Warning: doesn\'t support multiple keys!!')
@@ -331,35 +331,45 @@ class TianmoucDataReader(TianmoucDataReader_basic):
         TD_mean = [torch.zeros(160, 160) for _ in range(2)]
         TD_mean_odd = torch.zeros(160, 160)
         TD_mean_even = torch.zeros(160, 160)
+
+        odd_count = 0
+        even_count = 0
+        
         # odd_odd_FN
         for i in range(int(Num/2)):
             index = i * 2 + 1
-            tsdiff = self.get_raw_tsdiff_(index).clone()
-            if tsdiff.shape[1] < timelen:
+            tsdiff_ = self.get_raw_tsdiff_(index)
+            if tsdiff_ is None or tsdiff.shape[1] < timelen:
                 print('warninig:lost data may cause wrong denois results')
                 continue
+            tsdiff = tsdiff_.clone()
             for j in range(timelen//2):
                 TD_0 = tsdiff[0, 2 * j + 1, ...]
                 TD_mean_even += TD_0
+                even_count += 1
             for j in range(timelen//2+1):
                 TD_0 = tsdiff[0, 2 * j, ...]
                 TD_mean_odd += TD_0
+                odd_count += 1
         # odd_even_FN
         for i in range(int(Num/2)):
             index = i * 2
-            tsdiff = self.get_raw_tsdiff_(index).clone()
-            if tsdiff.shape[1] < timelen:
+            tsdiff_ = self.get_raw_tsdiff_(index)
+            if tsdiff_ is None or tsdiff.shape[1] < timelen:
                 print('warninig:lost data may cause wrong denois results')
                 continue
+            tsdiff = tsdiff_.clone()
             for j in range(timelen//2):
                 TD_0 = tsdiff[0, 2 * j + 1, ...]
                 TD_mean_odd += TD_0
+                odd_count += 1
             for j in range(timelen//2+1):
                 TD_0 = tsdiff[0, 2 * j, ...]
                 TD_mean_even += TD_0
+                even_count += 1
 
-        TD_mean_even/= (timelen*Num/2)
-        TD_mean_odd/= (timelen*Num/2)
+        TD_mean_even/= even_count
+        TD_mean_odd/= odd_count
 
         TD_mean_odd = custom_round(TD_mean_odd)
         TD_mean_even = custom_round(TD_mean_even)
@@ -379,36 +389,50 @@ class TianmoucDataReader(TianmoucDataReader_basic):
         '''
         tsdiff = self.get_raw_tsdiff_(0).clone()
         timelen = tsdiff.shape[1]-1
-        
+
+        odd_count = 0
+        even_count = 0
+
         SD_mean_left = [torch.zeros(160, 160) for _ in range(timelen*2)]
         SD_mean_right = [torch.zeros(160, 160) for _ in range(timelen*2)]
         # 偶数index中的25帧暗帧分别累积
-        for i in range(int(Num/2)):
+        for i in range(Num//2):
             index = 2 * i
-            tsdiff = self.get_raw_tsdiff_(index).clone()
-            if tsdiff.shape[1] < timelen:
+            tsdiff_ = self.get_raw_tsdiff_(index)
+            if tsdiff_ is None or tsdiff.shape[1] < timelen:
                 print('warninig:lost data may cause wrong denois results')
                 continue
+            tsdiff = tsdiff_.clone()
             for j in range(timelen):
                 SD_mean_left[j] += tsdiff[1, j, ...]
                 SD_mean_right[j] += tsdiff[2, j, ...]
+            even_count += 1
+            
         #标定奇数index中的25帧暗帧分别累计
-        for i in range(int(Num/2)):
+        for i in range(Num//2):
             index = 2 * i + 1  # Alternate indices for odd/even
-            tsdiff = self.get_raw_tsdiff_(index).clone()
-            if tsdiff.shape[1] < timelen:
+            tsdiff_ = self.get_raw_tsdiff_(index)
+            if tsdiff_ is None or tsdiff.shape[1] < timelen:
                 print('warninig:lost data may cause wrong denois results')
                 continue
+            tsdiff = tsdiff_.clone()
             for j in range(timelen):
-                SD_mean_left[j+25] += tsdiff[1, j, ...]
-                SD_mean_right[j+25] += tsdiff[2, j, ...]
-                
+                SD_mean_left[j+timelen] += tsdiff[1, j, ...]
+                SD_mean_right[j+timelen] += tsdiff[2, j, ...]
+            odd_count += 1     
+            
         #每一帧暗帧做平均，共有50帧标定暗帧
         for k in range(timelen*2):
-            SD_mean_left[k] /= (Num/2)
-            SD_mean_left[k] = custom_round(SD_mean_left[k])
-            SD_mean_right[k] /= (Num/2)
-            SD_mean_right[k] = custom_round(SD_mean_right[k])
+            if k < timelen:
+                SD_mean_left[k] /= even_count
+                SD_mean_left[k] = custom_round(SD_mean_left[k])
+                SD_mean_right[k] /= even_count
+                SD_mean_right[k] = custom_round(SD_mean_right[k])
+            else:
+                SD_mean_left[k] /= odd_count
+                SD_mean_left[k] = custom_round(SD_mean_left[k])
+                SD_mean_right[k] /= odd_count
+                SD_mean_right[k] = custom_round(SD_mean_right[k])               
 
         self.SD_mean_left = SD_mean_left
         self.SD_mean_right = SD_mean_right
