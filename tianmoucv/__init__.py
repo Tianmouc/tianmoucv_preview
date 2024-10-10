@@ -14,4 +14,4 @@ __contributor__ = 'T. Wang, Y. Chen, Y. Li'
 __authorEmail__ = '532109881@qq.com'
 
 
-print('TianMouCV™ 0.3.3.2, via',__author__,' Yuxiang Li add denoise api')
+print('TianMouCV™ 0.3.3.3, via',__author__,' Yuxiang Li add denoise api')
