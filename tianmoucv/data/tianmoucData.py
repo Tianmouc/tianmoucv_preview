@@ -114,6 +114,7 @@ class TianmoucDataReader(TianmoucDataReader_basic):
             self.aop_denoise_args.print_info()
             self.td_fpn_calibration_(Num=min(50,self.__len__()-1))
             self.sd_fpn_calibration_(Num=min(50,self.__len__()-1))
+            self.choose_correct_fpn(thr_1=self.aop_denoise_args.gain) #判断奇偶帧
             print('[datareader]calibration done')
             print('[datareader]Warning: AOP denoise is an experimental function,and haven\'t been used in nn training')
             print('[datareader]Warning: doesn\'t support multiple keys!!')
@@ -300,6 +301,58 @@ class TianmoucDataReader(TianmoucDataReader_basic):
     #>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>[去噪功能实验区]<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
     ###################################################################################################################################
 
+    def choose_correct_fpn(self,thr_1=1):
+
+        TD_dark = self.aop_denoise_args.aop_dark_dict['TD']
+        SDL_dark= self.aop_denoise_args.aop_dark_dict['SDL']
+        SDR_dark= self.aop_denoise_args.aop_dark_dict['SDR']
+        tsdiff = self.get_raw_tsdiff_(0)
+        #判断奇偶帧匹配
+        cal = tsdiff[0, 0, ...]
+        cal_0 = cal - TD_dark[0]
+        cal_1 = cal - TD_dark[1]
+        var_org = torch.var(cal)
+        var_cal0 = torch.var(cal_0)
+        var_cal1 = torch.var(cal_1)
+    
+        kernel = torch.ones((1, 1, 3, 3), dtype=torch.float32) / 9.0
+    
+        match_tensor_0 = cal_0.unsqueeze(0).unsqueeze(0)
+        smoothed_matrix = F.conv2d(match_tensor_0, kernel, padding=1)
+        smoothed_matrix = smoothed_matrix.squeeze(0).squeeze(0)
+        mask_0 = torch.abs(smoothed_matrix) >= thr_1
+    
+        match_tensor_1 = cal_1.unsqueeze(0).unsqueeze(0)
+        smoothed_matrix = F.conv2d(match_tensor_1, kernel, padding=1)
+        smoothed_matrix = smoothed_matrix.squeeze(0).squeeze(0)
+        mask_1 = torch.abs(smoothed_matrix) >= thr_1
+        mask_0 = mask_0.float()
+        mask_1 = mask_1.float()
+        var_0 = torch.var(mask_0)
+        var_1 = torch.var(mask_1)
+        TD_corrected_dark =  [torch.zeros(160, 160) for _ in range(2)]
+        SDL_corrected_dark =  [torch.zeros(160, 160) for _ in range(2)]
+        SDR_corrected_dark =  [torch.zeros(160, 160) for _ in range(2)]
+        if var_cal0 < var_cal1:
+            TD_corrected_dark[1] = TD_dark[1]
+            TD_corrected_dark[0] = TD_dark[0]
+            SDL_corrected_dark[1] = SDL_dark[1]
+            SDL_corrected_dark[0] = SDL_dark[0]
+            SDR_corrected_dark[1] = SDR_dark[1]
+            SDR_corrected_dark[0] = SDR_dark[0]
+        else:
+            TD_corrected_dark[1] = TD_dark[0]
+            TD_corrected_dark[0] = TD_dark[1]
+            SDL_corrected_dark[1] = SDL_dark[0]
+            SDL_corrected_dark[0] = SDL_dark[1]
+            SDR_corrected_dark[1] = SDR_dark[0]
+            SDR_corrected_dark[0] = SDR_dark[1]
+        self.aop_denoise_args.aop_dark_dict['TD'] = TD_corrected_dark
+        self.aop_denoise_args.aop_dark_dict['SDL'] = SDL_corrected_dark
+        self.aop_denoise_args.aop_dark_dict['SDR'] = SDR_corrected_dark
+        return TD_corrected_dark, SDL_corrected_dark, SDR_corrected_dark
+        
+
     def get_raw_tsdiff_(self, index):
         if index >= self.__len__():
             print('INDEX OUT OF RANGE!')
@@ -376,7 +429,6 @@ class TianmoucDataReader(TianmoucDataReader_basic):
 
         TD_mean[0]=TD_mean_even
         TD_mean[1]=TD_mean_odd
-
         self.TD_mean = TD_mean
 
         return TD_mean
@@ -389,7 +441,6 @@ class TianmoucDataReader(TianmoucDataReader_basic):
         '''
         tsdiff = self.get_raw_tsdiff_(0).clone()
         timelen = tsdiff.shape[1]-1
-
         odd_count = 0
         even_count = 0
 
@@ -513,7 +564,7 @@ class TianmoucDataReader(TianmoucDataReader_basic):
                     LSD.shape)
                 RSD_reconstructed = torch.stack([TD_20.float(), TD_10.float()], dim=1).view(
                     LSD.shape)
-                                        
+
                 #在原SDleft与SDright帧中根据模板提取信号
                 denoise_raw_tsd[1, j, ...] = raw_tsd[1, j, ...]*LSD_reconstructed
                 denoise_raw_tsd[2, j, ...] = raw_tsd[2, j, ...]*RSD_reconstructed
@@ -560,7 +611,6 @@ class TianmoucDataReader(TianmoucDataReader_basic):
                 TD_1 = conv_and_threshold_1(TD_1, 3, thr_3)
                 TD_10 = torch.abs(TD_1) >= thr_1
 
-
                 TD_2 = conv_and_threshold((sdll - sdur) / 2, 3, thr_2)
                 TD_2 = conv_and_threshold_1(TD_2, 3, thr_3)
                 TD_20 = torch.abs(TD_2) >= thr_1
@@ -569,7 +619,6 @@ class TianmoucDataReader(TianmoucDataReader_basic):
                     LSD.shape)
                 RSD_reconstructed = torch.stack([TD_20.float(), TD_10.float()], dim=1).view(
                     LSD.shape)
-
                 denoise_raw_tsd[1, j, ...] = raw_tsd[1, j, ...]*LSD_reconstructed
                 denoise_raw_tsd[2, j, ...] = raw_tsd[2, j, ...]*RSD_reconstructed
 

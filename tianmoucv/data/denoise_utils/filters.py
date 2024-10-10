@@ -8,14 +8,17 @@ import torch.nn as nn
 class denoise_defualt_args:
 
     def __init__(self):
-        self.aop_dark_dict = {'TD':[0,0],'SDL':[0,0],'SDR':[0,0]}
+        self.aop_dark_dict = {'TD':[torch.zeros(160, 160) for _ in range(2)],
+                              'SDL':[torch.zeros(160, 160) for _ in range(2)],
+                              'SDR':[torch.zeros(160, 160) for _ in range(2)]}
         self.thr_1 = 2
         self.thr_2 = 6
         self.thr_3 = 6  
+        self.gain = 1
         
     def print_info(self):
         print('------denoise_defualt_args----')
-        print('aop_dark_dict,dict,dark noise for td,sdl,sdr:',self.aop_dark_dict)
+        print('aop_dark_dict,dict,dark noise for td,sdl,sdr (key,length,shape):',[(key,len(self.aop_dark_dict[key]),self.aop_dark_dict[key][0].shape) for key in self.aop_dark_dict] )
         print('thr_1,float,template threshold:',self.thr_1)
         print('thr_2,float,Threshold for 3x3 avg pool:',self.thr_2)
         print('thr_3,float,Threshold for hot pixel:',self.thr_3)
@@ -29,7 +32,8 @@ def conv_and_threshold(input_tensor, kernel_size, threshold):
     # 粗滤波
     input_tensor_1 = input_tensor.unsqueeze(0).unsqueeze(0)  # 形状变为 (1, 1, h, w)
     input_tensor = torch.abs(input_tensor_1)
-    # 创建一个全1的卷积核
+
+    kernel_size = (kernel_size//2)*2 + 1
     conv_kernel = torch.ones((kernel_size, kernel_size), dtype=torch.float32)
 
     # 定义卷积层
@@ -58,6 +62,8 @@ def conv_and_threshold_1(input_tensor, kernel_size, threshold):
     input_tensor_1 = input_tensor.unsqueeze(0).unsqueeze(0)  # 形状变为 (1, 1, h, w)
     input_tensor = torch.abs(input_tensor_1)
     # 创建一个中间元素为0，其余为1的卷积核
+
+    kernel_size = (kernel_size//2)*2 + 1
     conv_kernel = torch.ones((kernel_size, kernel_size), dtype=torch.float32)
     conv_kernel[kernel_size // 2, kernel_size // 2] = 0  # 设置中间元素为0
 
@@ -81,3 +87,48 @@ def conv_and_threshold_1(input_tensor, kernel_size, threshold):
     result_tensor = result_tensor.squeeze(0).squeeze(0)  # 形状变回 (h, w)
 
     return result_tensor
+
+
+def dark_fpn(dataset_dark):
+    # get dark
+    TD_mean = [torch.zeros(160, 160) for _ in range(2)]
+    SDL_mean = [torch.zeros(160, 160) for _ in range(2)]
+    SDR_mean = [torch.zeros(160, 160) for _ in range(2)]
+    TD_mean_odd = torch.zeros(160, 160)
+    TD_mean_even = torch.zeros(160, 160)
+    SDL_mean_odd = torch.zeros(160, 160)
+    SDL_mean_even = torch.zeros(160, 160)
+    SDR_mean_odd = torch.zeros(160, 160)
+    SDR_mean_even = torch.zeros(160, 160)
+
+    even_cnt = 0
+    odd_cnt = 0
+    # for index in tqdm(range(start, start + 1)):
+    sample_dark = dataset_dark[1]
+    N_rod = sample_dark['rawDiff'].shape[1]
+    # One RGB (COP) have 25, 50 or more AOP(rod, diff) data, depends on the camera configuration
+    for j in range(N_rod):
+        rawDiff_dark = torch.Tensor(sample_dark['rawDiff'])
+        SD_dark = rawDiff_dark[1:3, j , ...].clone()
+        sd_l_dark = SD_dark[0,...]
+        sd_r_dark = SD_dark[1,...]
+        # TD record
+        td_dark = rawDiff_dark[0, j, ...].clone()
+        if j % 2 == 0:
+            TD_mean_even += td_dark
+            SDL_mean_even += sd_l_dark
+            SDR_mean_even += sd_r_dark
+            even_cnt += 1
+        else:
+            TD_mean_odd += td_dark
+            SDL_mean_odd += sd_l_dark
+            SDR_mean_odd += sd_r_dark
+            odd_cnt += 1
+    TD_mean[0] = custom_round(TD_mean_even / even_cnt)
+    TD_mean[1] = custom_round(TD_mean_odd / odd_cnt)
+    SDL_mean[0] = custom_round(SDL_mean_even / even_cnt)
+    SDL_mean[1] = custom_round(SDL_mean_odd / odd_cnt)
+    SDR_mean[0] = custom_round(SDR_mean_even / even_cnt)
+    SDR_mean[1] = custom_round(SDR_mean_odd / odd_cnt)
+    return TD_mean, SDL_mean, SDR_mean
+
