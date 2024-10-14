@@ -8,17 +8,25 @@ import torch.nn as nn
 class denoise_defualt_args:
 
     def __init__(self):
+        '''
         self.aop_dark_dict = {'TD':[torch.zeros(160, 160) for _ in range(2)],
                               'SDL':[torch.zeros(160, 160) for _ in range(2)],
                               'SDR':[torch.zeros(160, 160) for _ in range(2)]}
+        '''
+        self.aop_dark_dict = {'TD':None,
+                              'SDL':None,
+                              'SDR':None}
         self.thr_1 = 2
-        self.thr_2 = 6
-        self.thr_3 = 6  
+        self.thr_2 = 5
+        self.thr_3 = 5  
         self.gain = 1
         
     def print_info(self):
         print('------denoise_defualt_args----')
-        print('aop_dark_dict,dict,dark noise for td,sdl,sdr (key,length,shape):',[(key,len(self.aop_dark_dict[key]),self.aop_dark_dict[key][0].shape) for key in self.aop_dark_dict] )
+        if self.aop_dark_dict['TD'] is not None:
+            print('aop_dark_dict,dict,dark noise for td,sdl,sdr (key,length,shape):',[(key,len(self.aop_dark_dict[key]),self.aop_dark_dict[key][0].shape) for key in self.aop_dark_dict] )
+        else:
+            print('denoise_args didnot provide dark noise, data reader will try to calibrate fpn using bright aop data')
         print('thr_1,float,template threshold:',self.thr_1)
         print('thr_2,float,Threshold for 3x3 avg pool:',self.thr_2)
         print('thr_3,float,Threshold for hot pixel:',self.thr_3)

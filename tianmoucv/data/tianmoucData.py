@@ -104,17 +104,21 @@ class TianmoucDataReader(TianmoucDataReader_basic):
 
         self.aop_denoise = aop_denoise
         self.aop_denoise_args = aop_denoise_args
-        self.TD_mean = None
-        self.SD_mean_left = None
-        self.SD_mean_right = None        
         if self.aop_denoise:
             print('[datareader]Conducting Fixed Pattern Noise calibration...')
             print('[datareader]Customising aop_denoise_args using tianmoucv.data.denoise_utils.denoise_defualt_args()')
             print('[datareader]Better to provide:{\'TD\':[np.array]*2,\'SDL\':[np.array]*2,\'SDR\':[np.array]*2}')
-            self.aop_denoise_args.print_info()
-            self.td_fpn_calibration_(Num=min(50,self.__len__()-1))
-            self.sd_fpn_calibration_(Num=min(50,self.__len__()-1))
+            if self.aop_denoise_args.aop_dark_dict['TD'] is None:
+                print('[datareader] cannot find TD dark, use self calibration')
+                TD_dark = self.td_fpn_calibration_(Num=min(50,self.__len__()-1))
+                self.aop_denoise_args.aop_dark_dict['TD'] = TD_dark
+            if self.aop_denoise_args.aop_dark_dict['SDL'] is None:
+                print('[datareader] cannot find SDL dark, use self calibration')
+                SDL_dark,SDR_dark = self.sd_fpn_calibration_(Num=min(50,self.__len__()-1))
+                self.aop_denoise_args.aop_dark_dict['SDL'] = SDL_dark
+                self.aop_denoise_args.aop_dark_dict['SDR'] = SDR_dark 
             self.choose_correct_fpn(thr_1=self.aop_denoise_args.gain) #判断奇偶帧
+            self.aop_denoise_args.print_info()
             print('[datareader]calibration done')
             print('[datareader]Warning: AOP denoise is an experimental function,and haven\'t been used in nn training')
             print('[datareader]Warning: doesn\'t support multiple keys!!')
@@ -209,6 +213,7 @@ class TianmoucDataReader(TianmoucDataReader_basic):
         coneTimeStamp_list = []
         raw_list = []
 
+        #read all rgb frames
         for i in range(self.N+1):
             #print('caddr:',coneAddrs[i])
             frame,timestamp = self.readConeFast(conefilename,coneAddrs[i])
@@ -218,21 +223,22 @@ class TianmoucDataReader(TianmoucDataReader_basic):
             rgb_list.append(frame)
             coneTimeStamp_list.append(timestamp.astype(np.int64))
 
+        cone_id = legalSample['coneid']
+        rod_id = legalSample['rodid']
+
+        #prepare all meta infomation
         metaInfo['C_name'] = conefilename
         metaInfo['C_timestamp'] = coneTimeStamp_list
+        metaInfo['C_idx'] = cone_id
         metaInfo['R_name'] = rodfilename
         metaInfo['R_timestamp'] = []
+        metaInfo['R_idx'] = rod_id
         metaInfo['key'] = key
         metaInfo['sample_length'] = len(self.fileDict[key]['legalData'])
-        
         itter = len(rodAddrs)
-        if itter<0:
-            print('>>>>>>>>>>>>>WARNING:',key,coneStartId, cone_id, coneRange)
-            print('>>>>>>>>>>>>>WARNING:',itter , rodAddrs[itter-1] , rodAddrs[0])
-            return None
-        
-        tsd = torch.zeros([3,itter,self.rod_height,self.rod_width])
 
+        #read all aop frames
+        tsd = torch.zeros([3,itter,self.rod_height,self.rod_width])
         for i in range(itter):
             startAddr = rodAddrs[i]
             sdl,sdr,td,rodTimeStamp = self.readRodFast(rodfilename,startAddr)
@@ -241,8 +247,9 @@ class TianmoucDataReader(TianmoucDataReader_basic):
             tsd[2,i,:,:] = torch.Tensor(sdr.astype(np.float32)).view(self.rod_height,self.rod_width)
             metaInfo['R_timestamp'].append(rodTimeStamp.astype(np.int64))
 
+        #denoising
         if self.aop_denoise:
-            tsd = self.denoise_based_on_SD_(tsd, idx, 
+            tsd = self.denoise_based_on_SD_(tsd, rod_id, 
                                             TD_dark=self.aop_denoise_args.aop_dark_dict['TD'],
                                             SD_dark_left=self.aop_denoise_args.aop_dark_dict['SDL'], 
                                             SD_dark_right=self.aop_denoise_args.aop_dark_dict['SDR'], 
@@ -256,7 +263,6 @@ class TianmoucDataReader(TianmoucDataReader_basic):
             tsdiff_inter  = self.tsd_preprocess(tsd)
             tsdiff_resized = F.interpolate(tsdiff_inter,(320,640),mode='bilinear')
             sample['tsdiff'] = tsdiff_resized
-            
             for i in range(self.N+1): 
                 frame,frame_without_isp = self.rgb_preprocess(rgb_list[i])
                 frame_raw = raw_list[i]
@@ -302,11 +308,13 @@ class TianmoucDataReader(TianmoucDataReader_basic):
     ###################################################################################################################################
 
     def choose_correct_fpn(self,thr_1=1):
-
+        '''
+        空间噪声
+        '''
         TD_dark = self.aop_denoise_args.aop_dark_dict['TD']
         SDL_dark= self.aop_denoise_args.aop_dark_dict['SDL']
         SDR_dark= self.aop_denoise_args.aop_dark_dict['SDR']
-        tsdiff = self.get_raw_tsdiff_(0)
+        tsdiff,rodid = self.get_raw_tsdiff_(0)
         #判断奇偶帧匹配
         cal = tsdiff[0, 0, ...]
         cal_0 = cal - TD_dark[0]
@@ -328,8 +336,8 @@ class TianmoucDataReader(TianmoucDataReader_basic):
         mask_1 = torch.abs(smoothed_matrix) >= thr_1
         mask_0 = mask_0.float()
         mask_1 = mask_1.float()
-        var_0 = torch.var(mask_0)
-        var_1 = torch.var(mask_1)
+        var_0 = torch.var(mask_0)  #dark0和tsdiff0的匹配
+        var_1 = torch.var(mask_1)  #dark1和tsdiff1的匹配
         TD_corrected_dark =  [torch.zeros(160, 160) for _ in range(2)]
         SDL_corrected_dark =  [torch.zeros(160, 160) for _ in range(2)]
         SDR_corrected_dark =  [torch.zeros(160, 160) for _ in range(2)]
@@ -347,6 +355,8 @@ class TianmoucDataReader(TianmoucDataReader_basic):
             SDL_corrected_dark[0] = SDL_dark[1]
             SDR_corrected_dark[1] = SDR_dark[0]
             SDR_corrected_dark[0] = SDR_dark[1]
+
+        #已经换好顺序的fpn-dark
         self.aop_denoise_args.aop_dark_dict['TD'] = TD_corrected_dark
         self.aop_denoise_args.aop_dark_dict['SDL'] = SDL_corrected_dark
         self.aop_denoise_args.aop_dark_dict['SDR'] = SDR_corrected_dark
@@ -354,6 +364,9 @@ class TianmoucDataReader(TianmoucDataReader_basic):
         
 
     def get_raw_tsdiff_(self, index):
+        '''
+        只拿原始rod数据和其绝对id，提升效率
+        '''
         if index >= self.__len__():
             print('INDEX OUT OF RANGE!')
             return None     
@@ -363,6 +376,7 @@ class TianmoucDataReader(TianmoucDataReader_basic):
         legalSample = self.fileDict[key]['legalData'][index]
         rodfilename  = self.fileDict[key][self.pathways[0]]  # only read first one, if you want to use dual camera you can read it again
         rodAddrs = legalSample[self.pathways[0]]
+        rod_id = legalSample['rodid']
         itter = len(rodAddrs)
         assert itter>=0
         tsd = torch.zeros([3,itter,self.rod_height,self.rod_width])
@@ -372,13 +386,14 @@ class TianmoucDataReader(TianmoucDataReader_basic):
             tsd[0,i,:,:] = torch.Tensor(td.astype(np.float32)).view(self.rod_height,self.rod_width)
             tsd[1,i,:,:] = torch.Tensor(sdl.astype(np.float32)).view(self.rod_height,self.rod_width)
             tsd[2,i,:,:] = torch.Tensor(sdr.astype(np.float32)).view(self.rod_height,self.rod_width)
-        return tsd
+        return tsd,rod_id
         
     def td_fpn_calibration_(self,Num=20):
         '''
         计算奇数帧和偶数帧TD空间噪声，Num为标定所用的index数量
         '''
-        tsdiff = self.get_raw_tsdiff_(0).clone()
+        tsdiff_,rod_id = self.get_raw_tsdiff_(0)
+        tsdiff = tsdiff_.clone()
         timelen = tsdiff.shape[1]-1
         
         TD_mean = [torch.zeros(160, 160) for _ in range(2)]
@@ -387,111 +402,80 @@ class TianmoucDataReader(TianmoucDataReader_basic):
 
         odd_count = 0
         even_count = 0
-        
-        # odd_odd_FN
-        for i in range(int(Num/2)):
-            index = i * 2 + 1
-            tsdiff_ = self.get_raw_tsdiff_(index)
+        for i in range(Num):
+            tsdiff_,_ = self.get_raw_tsdiff_(i)
             if tsdiff_ is None or tsdiff.shape[1] < timelen:
-                print('warninig:lost data may cause wrong denois results')
+                print('warninig:lost data')
                 continue
             tsdiff = tsdiff_.clone()
-            for j in range(timelen//2):
-                TD_0 = tsdiff[0, 2 * j + 1, ...]
-                TD_mean_even += TD_0
-                even_count += 1
-            for j in range(timelen//2+1):
-                TD_0 = tsdiff[0, 2 * j, ...]
-                TD_mean_odd += TD_0
-                odd_count += 1
-        # odd_even_FN
-        for i in range(int(Num/2)):
-            index = i * 2
-            tsdiff_ = self.get_raw_tsdiff_(index)
-            if tsdiff_ is None or tsdiff.shape[1] < timelen:
-                print('warninig:lost data may cause wrong denois results')
-                continue
-            tsdiff = tsdiff_.clone()
-            for j in range(timelen//2):
-                TD_0 = tsdiff[0, 2 * j + 1, ...]
-                TD_mean_odd += TD_0
-                odd_count += 1
-            for j in range(timelen//2+1):
-                TD_0 = tsdiff[0, 2 * j, ...]
-                TD_mean_even += TD_0
-                even_count += 1
-
+            
+            for j in range(timelen):
+                TD_0 = tsdiff[0, j, ...]
+                if rod_id[j]%2==0:#偶数rod帧
+                    TD_mean_even += TD_0
+                    even_count += 1
+                if rod_id[j]%2==1:#偶数rod帧
+                    TD_mean_odd += TD_0
+                    odd_count += 1
+                
         TD_mean_even/= even_count
         TD_mean_odd/= odd_count
-
         TD_mean_odd = custom_round(TD_mean_odd)
         TD_mean_even = custom_round(TD_mean_even)
-
+        
         TD_mean[0]=TD_mean_even
         TD_mean[1]=TD_mean_odd
-        self.TD_mean = TD_mean
 
         return TD_mean
-
 
     def sd_fpn_calibration_(self,Num=20):
         '''
         计算奇数index帧和偶数index帧TD空间噪声，Num为标定所用的index数量
         返回标定的SD_mean_left, SD_mean_right
         '''
-        tsdiff = self.get_raw_tsdiff_(0).clone()
+        tsdiff_,rod_id = self.get_raw_tsdiff_(0)
+        tsdiff = tsdiff_.clone()
         timelen = tsdiff.shape[1]-1
         odd_count = 0
         even_count = 0
 
-        SD_mean_left = [torch.zeros(160, 160) for _ in range(timelen*2)]
-        SD_mean_right = [torch.zeros(160, 160) for _ in range(timelen*2)]
-        # 偶数index中的25帧暗帧分别累积
-        for i in range(Num//2):
-            index = 2 * i
-            tsdiff_ = self.get_raw_tsdiff_(index)
-            if tsdiff_ is None or tsdiff.shape[1] < timelen:
-                print('warninig:lost data may cause wrong denois results')
-                continue
-            tsdiff = tsdiff_.clone()
-            for j in range(timelen):
-                SD_mean_left[j] += tsdiff[1, j, ...]
-                SD_mean_right[j] += tsdiff[2, j, ...]
-            even_count += 1
-            
-        #标定奇数index中的25帧暗帧分别累计
-        for i in range(Num//2):
-            index = 2 * i + 1  # Alternate indices for odd/even
-            tsdiff_ = self.get_raw_tsdiff_(index)
-            if tsdiff_ is None or tsdiff.shape[1] < timelen:
-                print('warninig:lost data may cause wrong denois results')
-                continue
-            tsdiff = tsdiff_.clone()
-            for j in range(timelen):
-                SD_mean_left[j+timelen] += tsdiff[1, j, ...]
-                SD_mean_right[j+timelen] += tsdiff[2, j, ...]
-            odd_count += 1     
-            
-        #每一帧暗帧做平均，共有50帧标定暗帧
-        for k in range(timelen*2):
-            if k < timelen:
-                SD_mean_left[k] /= even_count
-                SD_mean_left[k] = custom_round(SD_mean_left[k])
-                SD_mean_right[k] /= even_count
-                SD_mean_right[k] = custom_round(SD_mean_right[k])
-            else:
-                SD_mean_left[k] /= odd_count
-                SD_mean_left[k] = custom_round(SD_mean_left[k])
-                SD_mean_right[k] /= odd_count
-                SD_mean_right[k] = custom_round(SD_mean_right[k])               
+        SD_mean_left = [torch.zeros(160, 160) for _ in range(2)]
+        SD_mean_right = [torch.zeros(160, 160) for _ in range(2)]
 
-        self.SD_mean_left = SD_mean_left
-        self.SD_mean_right = SD_mean_right
+        for i in range(Num):
+            tsdiff_,_ = self.get_raw_tsdiff_(i)
+            if tsdiff_ is None or tsdiff.shape[1] < timelen:
+                print('warninig:lost data')
+                continue
+            tsdiff = tsdiff_.clone()
+
+            for j in range(timelen):
+                SDL = tsdiff[1, j, ...]
+                SDR = tsdiff[2, j, ...]
+                
+                if rod_id[j]%2==0:#偶数rod帧
+                    SD_mean_left[0] += SDL
+                    SD_mean_right[0] += SDR
+                    even_count += 1
+                if rod_id[j]%2==1:#偶数rod帧
+                    SD_mean_left[1] += SDL
+                    SD_mean_right[1] += SDR
+                    odd_count += 1
+
+        SD_mean_left[0] /= even_count
+        SD_mean_left[0] = custom_round(SD_mean_left[0])
+        SD_mean_right[0] /= even_count
+        SD_mean_right[0] = custom_round(SD_mean_right[0])
+
+        SD_mean_left[1] /= odd_count
+        SD_mean_left[1] = custom_round(SD_mean_left[1])
+        SD_mean_right[1] /= odd_count
+        SD_mean_right[1] = custom_round(SD_mean_right[1])               
 
         return SD_mean_left, SD_mean_right
 
 
-    def denoise_based_on_SD_(self, raw_tsd, index, TD_dark=None, SD_dark_left=None, SD_dark_right=None, thr_1=1, thr_2=3, thr_3=3):
+    def denoise_based_on_SD_(self, raw_tsd, rod_id, TD_dark=None, SD_dark_left=None, SD_dark_right=None, thr_1=1, thr_2=3, thr_3=3):
         '''
         TD_dark为TD空间噪声，SD_dark_left与SD_dark_right为SD空间噪声，
         thr_1为对角线值平均以后的滤波阈值，thr_2和thr_3为
@@ -499,143 +483,60 @@ class TianmoucDataReader(TianmoucDataReader_basic):
         '''
         denoise_raw_tsd=torch.zeros(3, raw_tsd.shape[1], 160, 160)
 
-        #判断奇偶帧匹配
-        cal = raw_tsd[0, 0, ...].clone()
-
-        if TD_dark is None:
-            TD_dark = [0,0]
-        if SD_dark_left is None:
-            SD_dark_left = [0,0]
-        if SD_dark_right is None:
-            SD_dark_right = [0,0]
-            
-        cal_0 = cal - TD_dark[0]
-        cal_1 = cal - TD_dark[1]
-
-        kernel = torch.ones((1, 1, 3, 3), dtype=torch.float32) / 9.0
-
-        match_tensor_0 = cal_0.unsqueeze(0).unsqueeze(0)
-        smoothed_matrix = F.conv2d(match_tensor_0, kernel, padding=1)
-        smoothed_matrix = smoothed_matrix.squeeze(0).squeeze(0)
-        mask_0 = torch.abs(smoothed_matrix) >= thr_1
-
-        match_tensor_1 = cal_1.unsqueeze(0).unsqueeze(0)
-        smoothed_matrix = F.conv2d(match_tensor_1, kernel, padding=1)
-        smoothed_matrix = smoothed_matrix.squeeze(0).squeeze(0)
-        mask_1 = torch.abs(smoothed_matrix) >= thr_1
-        mask_0 = mask_0.float()
-        mask_1 = mask_1.float()
-        var_0 = torch.var(mask_0)
-        var_1 = torch.var(mask_1)
-
-        if var_0 < var_1:
-            for j in range(raw_tsd.shape[1]):
-                if (index % 2 == 1 and j % 2 == 0) or (index % 2 == 0 and j % 2 == 1):
-                    raw_tsd[0, j, ...] -= TD_dark[1]
-                    raw_tsd[1, j, ...] -= SD_dark_left[1]
-                    raw_tsd[2, j, ...] -= SD_dark_right[1]
-                else:
-                    raw_tsd[0, j, ...] -= TD_dark[0]
-                    raw_tsd[1, j, ...] -= SD_dark_left[0]
-                    raw_tsd[2, j, ...] -= SD_dark_right[0]
+        for j in range(raw_tsd.shape[1]):
+            if rod_id[j]%2 == 0:
+                raw_tsd[0, j, ...] -= TD_dark[0]
+                raw_tsd[1, j, ...] -= SD_dark_left[0]
+                raw_tsd[2, j, ...] -= SD_dark_right[0]               
+            else:
+                raw_tsd[0, j, ...] -= TD_dark[0]
+                raw_tsd[1, j, ...] -= SD_dark_left[0]
+                raw_tsd[2, j, ...] -= SD_dark_right[0]
                     
-                #TD只去除空间噪声
-                denoise_raw_tsd[0, j, ...]=raw_tsd[0,j,...]
-                #取出SDleft和SDright
-                LSD = (raw_tsd[1, j, ...]).clone()
-                RSD = (raw_tsd[2, j, ...]).clone()
-                # 取出SDul...
-                sdul = LSD[0::2, ...]
-                sdll = LSD[1::2, ...]
-                sdur = RSD[0::2, ...]
-                sdlr = RSD[1::2, ...]
-                # sdul与sdlr作差之后平均，使用一个阈值进行过滤后进行空间相关性滤波
-                TD_1 = conv_and_threshold((sdul - sdlr) / 2, 3, thr_2)
-                TD_1 = conv_and_threshold_1(TD_1, 3, thr_3)
-                TD_10 = torch.abs(TD_1) >=thr_1
-                TD_1 = (TD_1) * TD_10.float()
-                # sdll与sdur作差之后平均，使用一个阈值进行过滤后进行空间相关性滤波
-                TD_2 = conv_and_threshold((sdll - sdur) / 2, thr_3, thr_2)
-                TD_2 = conv_and_threshold_1(TD_2, 3, 5)
-                TD_20 = torch.abs(TD_2) >= thr_1
-                TD_2 = (TD_2) * TD_20.float()
-                #重建SDleft与SDright对应的模板
-                LSD_reconstructed = torch.stack([TD_10.float(), TD_20.float()], dim=1).view(
+            #TD只去除空间噪声
+            denoise_raw_tsd[0, j, ...]=raw_tsd[0,j,...]
+            #取出SDleft和SDright
+            LSD = (raw_tsd[1, j, ...]).clone()
+            RSD = (raw_tsd[2, j, ...]).clone()
+            # 取出SDul...
+            sdul = LSD[0::2, ...]
+            sdll = LSD[1::2, ...]
+            sdur = RSD[0::2, ...]
+            sdlr = RSD[1::2, ...]
+            # sdul与sdlr作差之后平均，使用一个阈值进行过滤后进行空间相关性滤波
+            TD_1 = conv_and_threshold((sdul - sdlr) / 2, 3, thr_2)
+            TD_1 = conv_and_threshold_1(TD_1, 3, thr_3)
+            TD_10 = torch.abs(TD_1) >=thr_1
+            TD_1 = (TD_1) * TD_10.float()
+            # sdll与sdur作差之后平均，使用一个阈值进行过滤后进行空间相关性滤波
+            TD_2 = conv_and_threshold((sdll - sdur) / 2, thr_3, thr_2)
+            TD_2 = conv_and_threshold_1(TD_2, 3, 5)
+            TD_20 = torch.abs(TD_2) >= thr_1
+            TD_2 = (TD_2) * TD_20.float()
+            #重建SDleft与SDright对应的模板
+            LSD_reconstructed = torch.stack([TD_10.float(), TD_20.float()], dim=1).view(
                     LSD.shape)
-                RSD_reconstructed = torch.stack([TD_20.float(), TD_10.float()], dim=1).view(
+            RSD_reconstructed = torch.stack([TD_20.float(), TD_10.float()], dim=1).view(
                     LSD.shape)
 
-                #在原SDleft与SDright帧中根据模板提取信号
-                denoise_raw_tsd[1, j, ...] = raw_tsd[1, j, ...]*LSD_reconstructed
-                denoise_raw_tsd[2, j, ...] = raw_tsd[2, j, ...]*RSD_reconstructed
+            #在原SDleft与SDright帧中根据模板提取信号
+            denoise_raw_tsd[1, j, ...] = raw_tsd[1, j, ...]*LSD_reconstructed
+            denoise_raw_tsd[2, j, ...] = raw_tsd[2, j, ...]*RSD_reconstructed
                 
-                '''
-                old td
-                '''
-                td = raw_tsd[0:1,j:j+1,...]
-                # Apply smoothing
-                kernel = torch.ones((1, 1, 3, 3), dtype=torch.float32) / 9.0  # Normalize
-                smoothed_matrix = F.conv2d(td, kernel, padding=1)
-                smoothed_matrix = smoothed_matrix.squeeze(0).squeeze(0)
-                # Create a mask based on the smoothed output
-                mask_1 = torch.abs(smoothed_matrix) >= thr_1
-                td = td.squeeze(0).squeeze(0) * mask_1
-                # Further processing using conv_and_threshold functions
-                td = conv_and_threshold(td, 3, thr_2)
-                denoise_raw_tsd[0, j, ...]  = conv_and_threshold_1(td, 3, thr_3)
-        else:
-            for j in range(raw_tsd.shape[1]):
-                if (index % 2 == 1 and j % 2 == 0) or (index % 2 == 0 and j % 2 == 1):
-                    raw_tsd[0, j, ...] -= TD_dark[0]
-                else:
-                    raw_tsd[0, j, ...] -= TD_dark[1]
-
-                if index % 2 != 0:
-                    raw_tsd[1, j, ...] -= SD_dark_left[0]
-                    raw_tsd[2, j, ...] -= SD_dark_right[1]
-                else:
-                    raw_tsd[1, j, ...] -= SD_dark_left[0]
-                    raw_tsd[2, j, ...] -= SD_dark_right[1]
-
-                denoise_raw_tsd[0, j, ...] = raw_tsd[0, j, ...]
-
-                LSD = (raw_tsd[1, j, ...]).clone()
-                RSD = (raw_tsd[2, j, ...]).clone()
-
-                sdul = LSD[0::2, ...]
-                sdll = LSD[1::2, ...]
-                sdur = RSD[0::2, ...]
-                sdlr = RSD[1::2, ...]
-
-                TD_1 = conv_and_threshold((sdul - sdlr) / 2, 3, thr_2)
-                TD_1 = conv_and_threshold_1(TD_1, 3, thr_3)
-                TD_10 = torch.abs(TD_1) >= thr_1
-
-                TD_2 = conv_and_threshold((sdll - sdur) / 2, 3, thr_2)
-                TD_2 = conv_and_threshold_1(TD_2, 3, thr_3)
-                TD_20 = torch.abs(TD_2) >= thr_1
-
-                LSD_reconstructed = torch.stack([TD_10.float(), TD_20.float()], dim=1).view(
-                    LSD.shape)
-                RSD_reconstructed = torch.stack([TD_20.float(), TD_10.float()], dim=1).view(
-                    LSD.shape)
-                denoise_raw_tsd[1, j, ...] = raw_tsd[1, j, ...]*LSD_reconstructed
-                denoise_raw_tsd[2, j, ...] = raw_tsd[2, j, ...]*RSD_reconstructed
-
-                '''
-                old td
-                '''
-                td = raw_tsd[0:1,j:j+1,...]
-                # Apply smoothing
-                kernel = torch.ones((1, 1, 3, 3), dtype=torch.float32) / 9.0  # Normalize
-                smoothed_matrix = F.conv2d(td, kernel, padding=1)
-                smoothed_matrix = smoothed_matrix.squeeze(0).squeeze(0)
-                # Create a mask based on the smoothed output
-                mask_1 = torch.abs(smoothed_matrix) >= thr_1
-                td = td.squeeze(0).squeeze(0) * mask_1
-                # Further processing using conv_and_threshold functions
-                td = conv_and_threshold(td, 3, thr_2)
-                denoise_raw_tsd[0, j, ...]  = conv_and_threshold_1(td, 3, thr_3)
+            '''
+            old td
+            '''
+            td = raw_tsd[0:1,j:j+1,...]
+            # Apply smoothing
+            kernel = torch.ones((1, 1, 3, 3), dtype=torch.float32) / 9.0  # Normalize
+            smoothed_matrix = F.conv2d(td, kernel, padding=1)
+            smoothed_matrix = smoothed_matrix.squeeze(0).squeeze(0)
+            # Create a mask based on the smoothed output
+            mask_1 = torch.abs(smoothed_matrix) >= thr_1
+            td = td.squeeze(0).squeeze(0) * mask_1
+            # Further processing using conv_and_threshold functions
+            td = conv_and_threshold(td, 3, thr_2)
+            denoise_raw_tsd[0, j, ...]  = conv_and_threshold_1(td, 3, thr_3)
 
         return denoise_raw_tsd
 
