@@ -97,46 +97,4 @@ def conv_and_threshold_1(input_tensor, kernel_size, threshold):
     return result_tensor
 
 
-def dark_fpn(dataset_dark):
-    # get dark
-    TD_mean = [torch.zeros(160, 160) for _ in range(2)]
-    SDL_mean = [torch.zeros(160, 160) for _ in range(2)]
-    SDR_mean = [torch.zeros(160, 160) for _ in range(2)]
-    TD_mean_odd = torch.zeros(160, 160)
-    TD_mean_even = torch.zeros(160, 160)
-    SDL_mean_odd = torch.zeros(160, 160)
-    SDL_mean_even = torch.zeros(160, 160)
-    SDR_mean_odd = torch.zeros(160, 160)
-    SDR_mean_even = torch.zeros(160, 160)
-
-    even_cnt = 0
-    odd_cnt = 0
-    # for index in tqdm(range(start, start + 1)):
-    sample_dark = dataset_dark[1]
-    N_rod = sample_dark['rawDiff'].shape[1]
-    # One RGB (COP) have 25, 50 or more AOP(rod, diff) data, depends on the camera configuration
-    for j in range(N_rod):
-        rawDiff_dark = torch.Tensor(sample_dark['rawDiff'])
-        SD_dark = rawDiff_dark[1:3, j , ...].clone()
-        sd_l_dark = SD_dark[0,...]
-        sd_r_dark = SD_dark[1,...]
-        # TD record
-        td_dark = rawDiff_dark[0, j, ...].clone()
-        if j % 2 == 0:
-            TD_mean_even += td_dark
-            SDL_mean_even += sd_l_dark
-            SDR_mean_even += sd_r_dark
-            even_cnt += 1
-        else:
-            TD_mean_odd += td_dark
-            SDL_mean_odd += sd_l_dark
-            SDR_mean_odd += sd_r_dark
-            odd_cnt += 1
-    TD_mean[0] = custom_round(TD_mean_even / even_cnt)
-    TD_mean[1] = custom_round(TD_mean_odd / odd_cnt)
-    SDL_mean[0] = custom_round(SDL_mean_even / even_cnt)
-    SDL_mean[1] = custom_round(SDL_mean_odd / odd_cnt)
-    SDR_mean[0] = custom_round(SDR_mean_even / even_cnt)
-    SDR_mean[1] = custom_round(SDR_mean_odd / odd_cnt)
-    return TD_mean, SDL_mean, SDR_mean
 

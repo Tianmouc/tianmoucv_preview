@@ -307,14 +307,14 @@ class TianmoucDataReader(TianmoucDataReader_basic):
     #>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>[去噪功能实验区]<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
     ###################################################################################################################################
 
-    def choose_correct_fpn(self,thr_1=1):
+    def choose_correct_fpn(self,thr_1=1,idx=0):
         '''
         空间噪声
         '''
         TD_dark = self.aop_denoise_args.aop_dark_dict['TD']
         SDL_dark= self.aop_denoise_args.aop_dark_dict['SDL']
         SDR_dark= self.aop_denoise_args.aop_dark_dict['SDR']
-        tsdiff,rodid = self.get_raw_tsdiff_(0)
+        tsdiff,rodid = self.get_raw_tsdiff_(idx)
         #判断奇偶帧匹配
         cal = tsdiff[0, 0, ...]
         cal_0 = cal - TD_dark[0]
@@ -336,12 +336,17 @@ class TianmoucDataReader(TianmoucDataReader_basic):
         mask_1 = torch.abs(smoothed_matrix) >= thr_1
         mask_0 = mask_0.float()
         mask_1 = mask_1.float()
+
         var_0 = torch.var(mask_0)  #dark0和tsdiff0的匹配
         var_1 = torch.var(mask_1)  #dark1和tsdiff1的匹配
+  
         TD_corrected_dark =  [torch.zeros(160, 160) for _ in range(2)]
         SDL_corrected_dark =  [torch.zeros(160, 160) for _ in range(2)]
         SDR_corrected_dark =  [torch.zeros(160, 160) for _ in range(2)]
-        if var_cal0 < var_cal1:
+
+        #如果第一帧是偶数帧，并且第一帧更适配[0]
+        #或者第一帧是偶数帧，并且第一帧更适配[1]
+        if (var_cal0 < var_cal1 and rodid[0] % 2 ==0) or (var_cal0 > var_cal1 and rodid[0] % 2 ==1):
             TD_corrected_dark[1] = TD_dark[1]
             TD_corrected_dark[0] = TD_dark[0]
             SDL_corrected_dark[1] = SDL_dark[1]
@@ -392,10 +397,9 @@ class TianmoucDataReader(TianmoucDataReader_basic):
         '''
         计算奇数帧和偶数帧TD空间噪声，Num为标定所用的index数量
         '''
-        tsdiff_,rod_id = self.get_raw_tsdiff_(0)
+        tsdiff_,_ = self.get_raw_tsdiff_(0)
         tsdiff = tsdiff_.clone()
         timelen = tsdiff.shape[1]-1
-        
         TD_mean = [torch.zeros(160, 160) for _ in range(2)]
         TD_mean_odd = torch.zeros(160, 160)
         TD_mean_even = torch.zeros(160, 160)
@@ -403,7 +407,8 @@ class TianmoucDataReader(TianmoucDataReader_basic):
         odd_count = 0
         even_count = 0
         for i in range(Num):
-            tsdiff_,_ = self.get_raw_tsdiff_(i)
+            tsdiff_,rod_id = self.get_raw_tsdiff_(i)
+            #print('[>>>>>>>>>>>debug>>>>>>>>>>>>>>>]',rod_id)
             if tsdiff_ is None or tsdiff.shape[1] < timelen:
                 print('warninig:lost data')
                 continue
@@ -426,6 +431,8 @@ class TianmoucDataReader(TianmoucDataReader_basic):
         TD_mean[0]=TD_mean_even
         TD_mean[1]=TD_mean_odd
 
+        print('debug,td count:',odd_count,even_count)
+        
         return TD_mean
 
     def sd_fpn_calibration_(self,Num=20):
@@ -433,17 +440,16 @@ class TianmoucDataReader(TianmoucDataReader_basic):
         计算奇数index帧和偶数index帧TD空间噪声，Num为标定所用的index数量
         返回标定的SD_mean_left, SD_mean_right
         '''
-        tsdiff_,rod_id = self.get_raw_tsdiff_(0)
+        tsdiff_,_ = self.get_raw_tsdiff_(0)
         tsdiff = tsdiff_.clone()
         timelen = tsdiff.shape[1]-1
         odd_count = 0
         even_count = 0
-
         SD_mean_left = [torch.zeros(160, 160) for _ in range(2)]
         SD_mean_right = [torch.zeros(160, 160) for _ in range(2)]
 
         for i in range(Num):
-            tsdiff_,_ = self.get_raw_tsdiff_(i)
+            tsdiff_,rod_id = self.get_raw_tsdiff_(i)
             if tsdiff_ is None or tsdiff.shape[1] < timelen:
                 print('warninig:lost data')
                 continue
@@ -470,7 +476,9 @@ class TianmoucDataReader(TianmoucDataReader_basic):
         SD_mean_left[1] /= odd_count
         SD_mean_left[1] = custom_round(SD_mean_left[1])
         SD_mean_right[1] /= odd_count
-        SD_mean_right[1] = custom_round(SD_mean_right[1])               
+        SD_mean_right[1] = custom_round(SD_mean_right[1])   
+
+        print('debug,sdl count:',odd_count,even_count)
 
         return SD_mean_left, SD_mean_right
 
