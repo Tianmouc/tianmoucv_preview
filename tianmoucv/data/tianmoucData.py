@@ -489,9 +489,9 @@ class TianmoucDataReader(TianmoucDataReader_basic):
                 raw_tsd[1, j, ...] -= SD_dark_left[0]
                 raw_tsd[2, j, ...] -= SD_dark_right[0]               
             else:
-                raw_tsd[0, j, ...] -= TD_dark[0]
-                raw_tsd[1, j, ...] -= SD_dark_left[0]
-                raw_tsd[2, j, ...] -= SD_dark_right[0]
+                raw_tsd[0, j, ...] -= TD_dark[1]
+                raw_tsd[1, j, ...] -= SD_dark_left[1]
+                raw_tsd[2, j, ...] -= SD_dark_right[1]
                     
             #TD只去除空间噪声
             denoise_raw_tsd[0, j, ...]=raw_tsd[0,j,...]
