@@ -105,23 +105,32 @@ class TianmoucDataReader(TianmoucDataReader_basic):
         self.aop_denoise = aop_denoise
         self.aop_denoise_args = aop_denoise_args
         if self.aop_denoise:
-            print('[datareader]Conducting Fixed Pattern Noise calibration...')
-            print('[datareader]Customising aop_denoise_args using tianmoucv.data.denoise_utils.denoise_defualt_args()')
-            print('[datareader]Better to provide:{\'TD\':[np.array]*2,\'SDL\':[np.array]*2,\'SDR\':[np.array]*2}')
+            print('[datareader]Customising your aop_denoise_args using tianmoucv.data.denoise_utils.denoise_defualt_args()')
+            print('[datareader]Better to provide:{\'TD\':[np.array]*2,\'SDL\':[np.array]*2*aop_cop_rate,\'SDR\':[np.array]*2*aop_cop_rate}')
             if self.aop_denoise_args.aop_dark_dict['TD'] is None:
-                print('[datareader] cannot find TD dark, use self calibration')
-                TD_dark = self.td_fpn_calibration_(Num=min(50,self.__len__()-1))
-                self.aop_denoise_args.aop_dark_dict['TD'] = TD_dark
+                if self.aop_denoise_args.self_calibration:
+                    print('[datareader] cannot find TD dark, use self calibration')
+                    self.aop_denoise_args.aop_dark_dict['TD'] = self.td_fpn_calibration_(Num=min(500,self.__len__()-1))
+                else:
+                    print('[datareader] cannot find SDL dark, use ZERO')
+                    self.aop_denoise_args.aop_dark_dict['TD'] = [torch.zeros(160, 160) for _ in range(2)]
+                    
             if self.aop_denoise_args.aop_dark_dict['SDL'] is None:
-                print('[datareader] cannot find SDL dark, use self calibration')
-                SDL_dark,SDR_dark = self.sd_fpn_calibration_(Num=min(50,self.__len__()-1))
-                self.aop_denoise_args.aop_dark_dict['SDL'] = SDL_dark
-                self.aop_denoise_args.aop_dark_dict['SDR'] = SDR_dark 
+                
+                if self.aop_denoise_args.self_calibration:
+                    print('[datareader] cannot find SDL dark, use self calibration')
+                    SDL_dark,SDR_dark = self.sd_fpn_calibration_(Num=min(500,self.__len__()-1))
+                    self.aop_denoise_args.aop_dark_dict['SDL'] = SDL_dark
+                    self.aop_denoise_args.aop_dark_dict['SDR'] = SDR_dark 
+                else:
+                    print('[datareader] cannot find SDL dark, use ZERO')
+                    self.aop_denoise_args.aop_dark_dict['SDL'] = [torch.zeros(160, 160) for _ in range(2)]
+                    self.aop_denoise_args.aop_dark_dict['SDR'] = [torch.zeros(160, 160) for _ in range(2)] 
+                
             self.choose_correct_fpn(thr_1=self.aop_denoise_args.gain) #判断奇偶帧
             self.aop_denoise_args.print_info()
-            print('[datareader]calibration done')
-            print('[datareader]Warning: AOP denoise is an experimental function,and haven\'t been used in nn training')
-            print('[datareader]Warning: doesn\'t support multiple keys!!')
+            print('[datareader]Warning: Doesn\'t support multiple keys!!')
+            
 
     #你可以重写这个extration逻辑以获得更复杂的数据读取方法，例如抽帧等        
     def extraction(self,MAXLEN,uniformSampler):
@@ -136,7 +145,6 @@ class TianmoucDataReader(TianmoucDataReader_basic):
                 sample_1 = legalFileList[sampleid+1]
                 cone1 = sample_0['coneid']
                 cone2 = sample_1['coneid']
-
                 if accum_count == 1:
                     newsample_merge['sysTimeStamp'] = sample_0['sysTimeStamp']
                     newsample_merge['coneid'] = cone1
@@ -292,11 +300,11 @@ class TianmoucDataReader(TianmoucDataReader_basic):
         定位在哪个sample里
         '''
         if index >= self.__len__():
-            print('INDEX OUT OF RANGE!')
+            print('[Data reader ERROR] INDEX OUT OF RANGE!')
             return None     
         key,relativeIndex = self.locateSample(index)
         if key is None:
-            print(">>>>>>>>>>>>>>>[Data reader ERROR] no data found! please check your data path and sample key")
+            print('[Data reader ERROR] No data Found for this key!')
             return None   
         sample = self.packRead(relativeIndex, key)
         if self.use_data_parser:
@@ -307,6 +315,12 @@ class TianmoucDataReader(TianmoucDataReader_basic):
     #>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>[去噪功能实验区]<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
     ###################################################################################################################################
 
+    def get_dark_noise(self):
+        '''
+        inspect dark noise or calibrate dark noise data
+        '''
+        return self.aop_denoise_args.aop_dark_dict
+        
     def choose_correct_fpn(self,thr_1=1,idx=0):
         '''
         空间噪声
@@ -315,6 +329,9 @@ class TianmoucDataReader(TianmoucDataReader_basic):
         SDL_dark= self.aop_denoise_args.aop_dark_dict['SDL']
         SDR_dark= self.aop_denoise_args.aop_dark_dict['SDR']
         tsdiff,rodid = self.get_raw_tsdiff_(idx)
+
+        timelen = tsdiff.shape[1]-1
+        
         #判断奇偶帧匹配
         cal = tsdiff[0, 0, ...]
         cal_0 = cal - TD_dark[0]
@@ -341,25 +358,34 @@ class TianmoucDataReader(TianmoucDataReader_basic):
         var_1 = torch.var(mask_1)  #dark1和tsdiff1的匹配
   
         TD_corrected_dark =  [torch.zeros(160, 160) for _ in range(2)]
-        SDL_corrected_dark =  [torch.zeros(160, 160) for _ in range(2)]
-        SDR_corrected_dark =  [torch.zeros(160, 160) for _ in range(2)]
+        SDL_corrected_dark =  [torch.zeros(160, 160) for _ in range(2*timelen)]
+        SDR_corrected_dark =  [torch.zeros(160, 160) for _ in range(2*timelen)]
 
+        if len(SDL_dark) <  2*timelen:
+            print('[Data reader Warning] Dark Noise mode does not match the data,use average-copy version(无法去横条纹)')
+            SDL_dark = [torch.mean(torch.stack(SDL_dark[0:len(SDL_dark)//2],dim=0),dim=0),torch.mean(torch.stack(SDL_dark[len(SDL_dark)//2:],dim=0),dim=0)]
+            SDL_dark = [SDL_dark[0]]*timelen + [SDL_dark[1]]*timelen
+            SDR_dark = [torch.mean(torch.stack(SDR_dark[0:len(SDR_dark)//2],dim=0),dim=0),torch.mean(torch.stack(SDR_dark[len(SDR_dark)//2:],dim=0),dim=0)]
+            SDR_dark = [SDR_dark[0]]*timelen + [SDR_dark[1]]*timelen
+            
         #如果第一帧是偶数帧，并且第一帧更适配[0]
         #或者第一帧是偶数帧，并且第一帧更适配[1]
         if (var_cal0 < var_cal1 and rodid[0] % 2 ==0) or (var_cal0 > var_cal1 and rodid[0] % 2 ==1):
             TD_corrected_dark[1] = TD_dark[1]
             TD_corrected_dark[0] = TD_dark[0]
-            SDL_corrected_dark[1] = SDL_dark[1]
-            SDL_corrected_dark[0] = SDL_dark[0]
-            SDR_corrected_dark[1] = SDR_dark[1]
-            SDR_corrected_dark[0] = SDR_dark[0]
+            for j in range(timelen):
+                SDL_corrected_dark[j] = SDL_dark[j] 
+                SDL_corrected_dark[j+timelen] = SDL_dark[j+timelen] 
+                SDR_corrected_dark[j] = SDR_dark[j] 
+                SDR_corrected_dark[j+timelen] = SDR_dark[j+timelen] 
         else:
             TD_corrected_dark[1] = TD_dark[0]
             TD_corrected_dark[0] = TD_dark[1]
-            SDL_corrected_dark[1] = SDL_dark[0]
-            SDL_corrected_dark[0] = SDL_dark[1]
-            SDR_corrected_dark[1] = SDR_dark[0]
-            SDR_corrected_dark[0] = SDR_dark[1]
+            for j in range(timelen):
+                SDL_corrected_dark[j] = SDL_dark[j+timelen] 
+                SDL_corrected_dark[j+timelen] = SDL_dark[j] 
+                SDR_corrected_dark[j] = SDR_dark[j+timelen] 
+                SDR_corrected_dark[j+timelen] = SDR_dark[j] 
 
         #已经换好顺序的fpn-dark
         self.aop_denoise_args.aop_dark_dict['TD'] = TD_corrected_dark
@@ -373,10 +399,11 @@ class TianmoucDataReader(TianmoucDataReader_basic):
         只拿原始rod数据和其绝对id，提升效率
         '''
         if index >= self.__len__():
-            print('INDEX OUT OF RANGE!')
+            print('Data reader ERROR] INDEX OUT OF RANGE!')
             return None     
         key,relativeIndex = self.locateSample(index)
         if key is None:
+            print('[Data reader ERROR] No data Found for this key!')
             return None   
         legalSample = self.fileDict[key]['legalData'][index]
         rodfilename  = self.fileDict[key][self.pathways[0]]  # only read first one, if you want to use dual camera you can read it again
@@ -410,7 +437,7 @@ class TianmoucDataReader(TianmoucDataReader_basic):
             tsdiff_,rod_id = self.get_raw_tsdiff_(i)
             #print('[>>>>>>>>>>>debug>>>>>>>>>>>>>>>]',rod_id)
             if tsdiff_ is None or tsdiff.shape[1] < timelen:
-                print('warninig:lost data')
+                print('[Data Reader warninig] td_fpn_calibration_ lost data')
                 continue
             tsdiff = tsdiff_.clone()
             
@@ -431,7 +458,7 @@ class TianmoucDataReader(TianmoucDataReader_basic):
         TD_mean[0]=TD_mean_even
         TD_mean[1]=TD_mean_odd
 
-        print('debug,td count:',odd_count,even_count)
+        print('[Data Reader] TD CALIB NUM:',odd_count,even_count)
         
         return TD_mean
 
@@ -445,40 +472,43 @@ class TianmoucDataReader(TianmoucDataReader_basic):
         timelen = tsdiff.shape[1]-1
         odd_count = 0
         even_count = 0
-        SD_mean_left = [torch.zeros(160, 160) for _ in range(2)]
-        SD_mean_right = [torch.zeros(160, 160) for _ in range(2)]
+        SD_mean_left = [torch.zeros(160, 160) for _ in range(2*timelen)]
+        SD_mean_right = [torch.zeros(160, 160) for _ in range(2*timelen)]
 
         for i in range(Num):
             tsdiff_,rod_id = self.get_raw_tsdiff_(i)
             if tsdiff_ is None or tsdiff.shape[1] < timelen:
-                print('warninig:lost data')
+                print('[Data Reader warninig] sd_fpn_calibration_ lost data')
                 continue
             tsdiff = tsdiff_.clone()
 
-            for j in range(timelen):
-                SDL = tsdiff[1, j, ...]
-                SDR = tsdiff[2, j, ...]
-                
-                if rod_id[j]%2==0:#偶数rod帧
-                    SD_mean_left[0] += SDL
-                    SD_mean_right[0] += SDR
-                    even_count += 1
-                if rod_id[j]%2==1:#偶数rod帧
-                    SD_mean_left[1] += SDL
-                    SD_mean_right[1] += SDR
-                    odd_count += 1
+            if rod_id[0]%2==0:#偶数rod帧,考虑条纹噪声
+                even_count += 1
+                for j in range(timelen):
+                    SDL = tsdiff[1, j, ...]
+                    SDR = tsdiff[2, j, ...]
+                    SD_mean_left[j] += SDL
+                    SD_mean_right[j] += SDR
+            else:#偶数rod帧,考虑条纹噪声
+                odd_count += 1
+                for j in range(timelen):
+                    SDL = tsdiff[1, j, ...]
+                    SDR = tsdiff[2, j, ...]
+                    SD_mean_left[j+timelen] += SDL
+                    SD_mean_right[j+timelen] += SDR
 
-        SD_mean_left[0] /= even_count
-        SD_mean_left[0] = custom_round(SD_mean_left[0])
-        SD_mean_right[0] /= even_count
-        SD_mean_right[0] = custom_round(SD_mean_right[0])
+        for j in range(timelen):
+            SD_mean_left[j] /= even_count
+            SD_mean_left[j] = custom_round(SD_mean_left[j])
+            SD_mean_right[j] /= even_count
+            SD_mean_right[j] = custom_round(SD_mean_right[j])
 
-        SD_mean_left[1] /= odd_count
-        SD_mean_left[1] = custom_round(SD_mean_left[1])
-        SD_mean_right[1] /= odd_count
-        SD_mean_right[1] = custom_round(SD_mean_right[1])   
+            SD_mean_left[j+timelen] /= odd_count
+            SD_mean_left[j+timelen] = custom_round(SD_mean_left[j+timelen])
+            SD_mean_right[j+timelen] /= odd_count
+            SD_mean_right[j+timelen] = custom_round(SD_mean_right[j+timelen])   
 
-        print('debug,sdl count:',odd_count,even_count)
+        print('[Data Reader] SD CALIB NUM:',odd_count,even_count)
 
         return SD_mean_left, SD_mean_right
 
@@ -491,15 +521,20 @@ class TianmoucDataReader(TianmoucDataReader_basic):
         '''
         denoise_raw_tsd=torch.zeros(3, raw_tsd.shape[1], 160, 160)
 
+        timelen = raw_tsd.shape[1] - 1
+
         for j in range(raw_tsd.shape[1]):
             if rod_id[j]%2 == 0:
                 raw_tsd[0, j, ...] -= TD_dark[0]
-                raw_tsd[1, j, ...] -= SD_dark_left[0]
-                raw_tsd[2, j, ...] -= SD_dark_right[0]               
             else:
                 raw_tsd[0, j, ...] -= TD_dark[1]
-                raw_tsd[1, j, ...] -= SD_dark_left[1]
-                raw_tsd[2, j, ...] -= SD_dark_right[1]
+
+            if rod_id[0]%2 == 0:
+                raw_tsd[1, j, ...] -= SD_dark_left[j%timelen]
+                raw_tsd[2, j, ...] -= SD_dark_right[j%timelen]    
+            else:
+                raw_tsd[1, j, ...] -= SD_dark_left[j%timelen+timelen]
+                raw_tsd[2, j, ...] -= SD_dark_right[j%timelen+timelen]
                     
             #TD只去除空间噪声
             denoise_raw_tsd[0, j, ...]=raw_tsd[0,j,...]

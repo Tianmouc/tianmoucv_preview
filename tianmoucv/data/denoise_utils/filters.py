@@ -7,26 +7,34 @@ import torch.nn as nn
 
 class denoise_defualt_args:
 
-    def __init__(self):
+    def __init__(self,
+                 thr_1 = 1,
+                 thr_2 = 3, 
+                 thr_3 = 3,
+                 aop_gain=1,
+                 self_calibration=False):
         '''
         self.aop_dark_dict = {'TD':[torch.zeros(160, 160) for _ in range(2)],
-                              'SDL':[torch.zeros(160, 160) for _ in range(2)],
-                              'SDR':[torch.zeros(160, 160) for _ in range(2)]}
+                              'SDL':[torch.zeros(160, 160) for _ in range(2*N)],
+                              'SDR':[torch.zeros(160, 160) for _ in range(2*N)]}
         '''
         self.aop_dark_dict = {'TD':None,
                               'SDL':None,
                               'SDR':None}
-        self.thr_1 = 2
-        self.thr_2 = 5
-        self.thr_3 = 5  
-        self.gain = 1
+        self.thr_1 = thr_1 * aop_gain
+        self.thr_2 = thr_2 * aop_gain
+        self.thr_3 = thr_3 * aop_gain
+        self.gain = aop_gain
+        self.self_calibration = self_calibration
+        if self_calibration:
+            print('[denoise_defualt_args]data reader will try to calibrate fpn using its own aop data, set to [True] for dark noise data')
         
     def print_info(self):
         print('------denoise_defualt_args----')
         if self.aop_dark_dict['TD'] is not None:
             print('aop_dark_dict,dict,dark noise for td,sdl,sdr (key,length,shape):',[(key,len(self.aop_dark_dict[key]),self.aop_dark_dict[key][0].shape) for key in self.aop_dark_dict] )
         else:
-            print('denoise_args didnot provide dark noise, data reader will try to calibrate fpn using bright aop data')
+            print('denoise_args didnot provide dark noise, data reader will try to calibrate fpn using bright aop data(self_calibration=True), or use ZEROS(self_calibration=False)')
         print('thr_1,float,template threshold:',self.thr_1)
         print('thr_2,float,Threshold for 3x3 avg pool:',self.thr_2)
         print('thr_3,float,Threshold for hot pixel:',self.thr_3)
