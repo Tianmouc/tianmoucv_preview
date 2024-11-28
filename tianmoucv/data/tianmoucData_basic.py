@@ -54,6 +54,7 @@ class TianmoucDataReader_basic():
         self.sampleNumDict = dict([])
         self.sampleNum = 0
         self.EXT="tmdat"
+        self.clip_completeness= dict([])
 
         if not matchkey is None:
             if isinstance(matchkey, str):
@@ -61,7 +62,7 @@ class TianmoucDataReader_basic():
             elif isinstance(matchkey, list):
                 pass 
             else:
-                raise TypeError("The matchkey must be either a string or a list.")
+                raise TypeError("[tianmoucv Datareader]The matchkey must be either a string or a list.")
 
         self.blc = 0
         if isinstance(dark_level,str):
@@ -71,7 +72,7 @@ class TianmoucDataReader_basic():
                 if dark_level.split('.')[-1] == 'npy':
                     self.blc =  np.load(dark_level)
         elif isinstance(dark_level,np.ndarray):
-            print('dark_level_average:',np.mean(dark_level))
+            print('[tianmoucv Datareader]dark_level_average:',np.mean(dark_level))
             self.blc = dark_level
 
         self.training = training
@@ -105,12 +106,12 @@ class TianmoucDataReader_basic():
             datalist = np.load(cachePath, allow_pickle=True)
             self.fileDict = datalist.item()
             if self.print_info:
-                print("--->data loader: succesfully read cached file:",cachePath)
+                print("[tianmoucv Datareader]Succesfully read cached file:",cachePath)
         else:
             self.fileDict = dict([])
             self.addMoreSample(self.fileDict,path,matchkey=matchkey,strict = strict,camera_idx= 0)
             if ifcache:
-                print('making cache file...')
+                print('[tianmoucv Datareader]Making cache file...')
                 np.save(cachePath, self.fileDict)
         
         #Scan all samples to generate a file list, use to control the sparsity
@@ -121,10 +122,10 @@ class TianmoucDataReader_basic():
             self.sampleNumDict[key] =  self.dataNum(key)
             self.sampleNum += self.dataNum(key)
             if self.print_info:
-                print(key[0:20],'..., --- containing [RGB,NxTSD] sample:',self.dataNum(key),' packs')
+                print('[tianmoucv Datareader]',key[0:20],'..., --- containing [RGB,NxTSD] sample:',self.dataNum(key),' packs')
                 
         if self.sampleNum == 0:
-            print("ERROR: no data found! please check your data path and sample key")
+            print("[tianmoucv Datareader Error] No data found for this key! please check your data path and sample key")
             print(path,matchkey)
             
     #用递归的方法获取所有tmdat结尾的数据
@@ -132,7 +133,7 @@ class TianmoucDataReader_basic():
 
         if not os.path.exists(top_path):
             if self.print_info:
-                print(top_path, 'does not exsist')
+                print('[tianmoucv Datareader Error]',top_path, 'does not exsist')
             return None
 
         if os.path.isdir(top_path):
@@ -154,7 +155,7 @@ class TianmoucDataReader_basic():
                             raw_data_file_path = os.path.join(pw_path, raw_file_list[0])
                             if not (os.path.isfile(raw_data_file_path) and raw_data_file_path.split('.')[-1]=='tmdat'):
                                 check_pw_completeness = False
-                                print(raw_data_file_path,':not exsists')
+                                print('[tianmoucv Datareader Error]',raw_data_file_path,':not exsists')
 
                 #如果数据通路文件夹存在且符合规律,说明探到底层，终止并返回
                 if check_pw_completeness:
@@ -220,7 +221,7 @@ class TianmoucDataReader_basic():
         elif isinstance(dataset_top,str):
             self.find_all_tmdat_file(dataset_top,fileDict, camera_idx= camera_idx, matchkey=matchkey)
         else:
-            print('dataset_top:',dataset_top,' is not list or string')
+            print('[tianmoucv Datareader Warning]dataset_top:',dataset_top,' is not list or string')
 
             
         keylist = [key for key in fileDict]
@@ -240,7 +241,7 @@ class TianmoucDataReader_basic():
             rodFileRawFile = fileDict[key][self.pathways[0]]
             systimeStamp = fileDict[key]['sysTimeStamp']
             rodfilepersample = 25
-            
+            self.clip_completeness[key] = True
             try:
                 rod_tmdat_path = '/'+os.path.join(*rodFileRawFile.split('/')[:-1])
                 rod_tmdat_path_list = os.listdir(rod_tmdat_path)
@@ -269,8 +270,7 @@ class TianmoucDataReader_basic():
                             if rod_adc_precision == 2 and rod_mode == 1:
                                 rodfilepersample = 110
             except:
-                #旧文件，默认都是25或者自适应读取
-                pass
+                print('[tianmoucv Datareader Warning]TXT Description File Missing, set rodfilepersample == 25 as default')
 
                                         
             rodTimeList = []
@@ -341,25 +341,32 @@ class TianmoucDataReader_basic():
                     else:
                         legalSample['labels'] = [['HDR', '0'], ['HS', '0'], 
                                              ['Blur', '0'], ['Noisy', '0']]
-                        
                     legalFileList.append(legalSample)
                 else:
+                    self.clip_completeness[key] = False
                     if self.print_info:
-                        print('recoreded rod:',ridx2 - ridx1,' expected:',rodfilepersample)
-                        print('if you wish to read all data neglecting data loss, set strict=False for datareader')
+                        print('[tianmoucv Datareader Warning]Recoreded Rod:',ridx2 - ridx1,' expected:',rodfilepersample,' in cone id:',ct1)
+                        print('[tianmoucv Datareader Warning]if you wish to read all data neglecting data loss, set strict=False for datareader')
+                        print(coneTimeList[cidx-2:cidx+2])
+                        print(rodTimeList[ridx-25:ridx+25])
                     continue
                     
             fileDict[key]['legalData'] = legalFileList
             fileDict[key]['dataRatio'] = rodfilepersample
 
         return fileDict  
+
+    def get_clip_completeness(self):
+        '''
+        return a dict with matchkey that recorded the completeness of each sample
+        '''
+        return self.clip_completeness
               
-    
     def extraction(self,MAXLEN,uniformSampler):
         '''
         cut the MAXLEN
         '''
-        print('>>> YOU ARE USING ORIGINAL VERSION')
+        print('>>>[tianmoucv Datareader Warning] YOU ARE USING ORIGINAL VERSION')
         for key in self.fileDict:
             if self.print_info:
                 legalFileList = self.fileDict[key]['legalData'] 
@@ -461,8 +468,8 @@ class TianmoucDataReader_basic():
         
         itter = len(rodAddrs)
         if itter<0:
-            print('>>>>>>>>>>>>>WARNING:',key,coneStartId, cone_id, coneRange)
-            print('>>>>>>>>>>>>>WARNING:',itter , rodAddrs[itter-1] , rodAddrs[0])
+            print('[tianmoucv Datareader Warning]:',key,coneStartId, cone_id, coneRange)
+            print('[tianmoucv Datareader Warning]:',itter , rodAddrs[itter-1] , rodAddrs[0])
             return None
         
         tsd = torch.zeros([3,itter,self.rod_height,self.rod_width])
