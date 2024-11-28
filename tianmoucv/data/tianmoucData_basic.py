@@ -347,8 +347,6 @@ class TianmoucDataReader_basic():
                     if self.print_info:
                         print('[tianmoucv Datareader Warning]Recoreded Rod:',ridx2 - ridx1,' expected:',rodfilepersample,' in cone id:',ct1)
                         print('[tianmoucv Datareader Warning]if you wish to read all data neglecting data loss, set strict=False for datareader')
-                        print(coneTimeList[cidx-2:cidx+2])
-                        print(rodTimeList[ridx-25:ridx+25])
                     continue
                     
             fileDict[key]['legalData'] = legalFileList
