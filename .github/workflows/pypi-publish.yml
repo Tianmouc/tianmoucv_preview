@@ -38,6 +38,3 @@ jobs:
       run:  python setup.py bdist_wheel
     - name: Publish package
       uses: pypa/gh-action-pypi-publish@master
-      with:
-        user: __token__
-        password: ${{secrets.PYPI_API_TOKEN}}
