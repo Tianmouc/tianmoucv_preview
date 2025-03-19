@@ -143,23 +143,29 @@ def smooth_edges(img):
     # 闭运算，先膨胀再腐蚀，使边缘更平滑
     closing = cv2.morphologyEx(opening, cv2.MORPH_CLOSE, kernel, iterations=1)
     # 使用高斯滤波进一步平滑边缘
-    blurred = cv2.GaussianBlur(closing, (5, 5), 0)
+    blurred = cv2.GaussianBlur(closing, (5, 5), sigmaX=1)
     return blurred
     
 def genMask(gray,th = 24, maxV=255, minV = 0):
     '''
     生成过欠曝区域遮罩
-    '''
+    '''    
     gap = maxV- minV
     mask_ts = (gray < (maxV-th)/gap).float() #( (gray < (maxV-th)/gap) * (gray > (minV+th)/gap) ).float()
     mask_np = mask_ts.cpu().numpy()
-    mask_np_b = (mask_np * gap).astype(np.uint8)
-    mask_np_b = smooth_edges(mask_np_b)
-    mask_np = (mask_np_b>0.5)
-    return torch.Tensor(mask_np).to(gray.device).bool()
+    mask_np_gap = (mask_np * gap).astype(np.uint8)
+
+    if gray.ndim== 3:
+        mask_np_b = np.zeros_like(mask_np_gap)
+        for c in range(3):
+            mask_np_b[:,:,c] = smooth_edges(mask_np_gap[:,:,c])
+    else:
+        mask_np_b = smooth_edges(mask_np_gap)
+
+    return torch.FloatTensor(mask_np_b).to(gray.device)
 
 
-def poisson_blending(Ix,Iy,srcimg=None, iteration=20, mask_rgb=False, mask_th = 24):
+def poisson_blending(Ix,Iy,srcimg=None, iteration=20, mask_rgb=False, mask_th = 24, smooth=True):
     '''
     RGB/灰度 HDR 融合重建
 
@@ -187,7 +193,13 @@ def poisson_blending(Ix,Iy,srcimg=None, iteration=20, mask_rgb=False, mask_th = 
         print('img shape:',srcimg.shape,' is illegal, [None],[H,W],[H,W,C] is supported')
 
     if mask_rgb and not result is None:
-        result[mask] = srcimg[mask] 
+        if smooth:
+            mask /= 255.0
+            result = (1-mask) * result + mask * srcimg
+        else:
+            mask = mask>0.5
+            mask = mask.bool()
+            result[mask] = srcimg[mask]
 
     return result
 

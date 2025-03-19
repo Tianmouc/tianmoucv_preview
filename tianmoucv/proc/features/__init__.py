@@ -1,3 +1,3 @@
-from .diff import HarrisCorner,sift,hog,TomasiCorner,sobel_operator
+from .diff import HarrisCorner,hog,TomasiCorner,sobel_operator,steadyHarrisCornerForSIFT,compute_multiscale_sift_descriptor
 
 #这个包里是特征相关的

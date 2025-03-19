@@ -1,15 +1,14 @@
+# author: yihan lin
 import cv2
 import sys
-
 import numpy as np
-from scipy.optimize import linear_sum_assignment
-from scipy import signal
 from PIL import Image
 
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
 
+import math
 
 #===============================================================
 # sobel
@@ -68,7 +67,7 @@ def gaussian_smooth(inputTensor: torch.Tensor, kernel: torch.Tensor) -> torch.Te
 # ===============================================================
 # Harris角点，用Ix和Iy做计算，可以用SD的两个方向
 # ===============================================================
-def HarrisCorner(Ix:torch.Tensor,Iy:torch.Tensor,k = 0.1,th = 0.5,size=5,sigma=1,nmsSize=11):
+def HarrisCorner(Ix:torch.Tensor,Iy:torch.Tensor, thresh = 0.1,k = 0.1,size=5,sigma=1,nmsSize=11):
     '''
     Harris 角点检测
     
@@ -87,31 +86,34 @@ def HarrisCorner(Ix:torch.Tensor,Iy:torch.Tensor,k = 0.1,th = 0.5,size=5,sigma=1
         :param k: 是一个经验参数,0-1,float
 
     '''
-
-    # 1. get difference image
-    Ix[Ix<torch.max(Ix)*0.02]=0
-    Iy[Iy<torch.max(Iy)*0.02]=0
-    # 2. sober filtering
+    # 1. sober filtering
     Ix2 = Ix ** 2
     Iy2 = Iy ** 2
     Ixy = Ix * Iy
-   # 3. windowed
+    # 3. corner detect
     kernel = gaussain_kernel(size,sigma)
     Ix2 = gaussian_smooth(Ix2.unsqueeze(0).unsqueeze(0), kernel).squeeze(0).squeeze(0)
     Iy2 = gaussian_smooth(Iy2.unsqueeze(0).unsqueeze(0), kernel).squeeze(0).squeeze(0)
     Ixy = gaussian_smooth(Ixy.unsqueeze(0).unsqueeze(0), kernel).squeeze(0).squeeze(0)
-    # 4. corner detect
-    out = np.zeros(Ix2.shape)
+
     R = (Ix2 * Iy2 - Ixy ** 2) - k * ((Ix2 + Iy2) ** 2)
-    threshold =  float(torch.max(R)) * th
-    R_Max = F.max_pool2d(R.unsqueeze(0).unsqueeze(0), kernel_size=nmsSize, 
-                             stride=1, padding=nmsSize//2).squeeze(0).squeeze(0)
-    idmap = (R >= threshold).int() * (R > R_Max*0.999).int()
-    R = R[idmap>0]
-        
-    return idmap,R
+    
+    corner_list = []
+    for i in range(R.shape[0]):
+        for j in range(R.shape[1]):
+            if R[i,j] > thresh:
+                i_min = max(i-nmsSize//2,0)
+                i_max = min(i+nmsSize//2,R.shape[0]-1)
+                j_min = max(j-nmsSize//2,0)
+                j_max = min(j+nmsSize//2,R.shape[1]-1)
+                neibor = R[i_min:i_max,j_min:j_max]
+                if R[i,j] >= torch.max(neibor)-1e-5:
+                    corner_list.append((i,j))
 
+    print('[tianmoucv.HarrisCorner]detect ', len(corner_list),' corner points')
+    return corner_list
 
+    
 # ===============================================================
 # Shi-Tomasi角点，用Ix和Iy做计算，可以用SD的两个方向
 # ===============================================================
@@ -147,82 +149,22 @@ def TomasiCorner(Ix:torch.Tensor, Iy:torch.Tensor, index=1000,size=5,sigma=2,nms
     K = Ix2**2 + Iy2 **2 + Iy2*Ix2 + Ixy**2 + 1e-16
     R = Ix2 + Iy2 - torch.sqrt(K)
     # detect corner
+    
     sorted_, _ = torch.sort(R.view(1,-1), descending=True)#descending为False，升序，为True，降序
     threshold = sorted_[0,index]
-    R_Max = F.max_pool2d(R.unsqueeze(0).unsqueeze(0), kernel_size=nmsSize, 
-                             stride=1, padding=nmsSize//2).squeeze(0).squeeze(0)
-    idmap = (R >= threshold).int() * (R > R_Max*0.999).int()
-    return idmap,R
-
-
-# ===============================================================
-# ******in testing******  Harris3D角点，用Ix和Iy做计算，可以用SD的两个方向
-# ===============================================================
-def HarrisCorner3(Ix:torch.Tensor,Iy:torch.Tensor,It:torch.Tensor,k = 0.5,th = 0.95,size=5,sigma=2):
-    '''
-    Harris3D角点，用Ix和Iy做计算，可以用SD的两个方向
     
-    如果小正方体沿z方向移动，那小正方体里的点云数量应该不变
-    如果小正方体位于边缘上，则沿边缘移动，点云数量几乎不变，沿垂直边缘方向移动，点云数量改
-    如果小正方体位于角点上，则有两个方向都会大幅改变点云数量
-    拓展到3D中则使用法向量(包含法线和方向两个信息)
-    
-    .. math::    A = Ix * Ix
-    .. math::    B = Iy * Iy
-    .. math::    C = It * It
-    .. math::    D = Ix * Iy
-    .. math::    E = Ix * It
-    .. math::    F = Iy * It
-    .. math:: M= [[A F E];[F B D];[E D C]]
-    
-    Harris 角点检测
-    similar,
-    
-    .. math:: R=det(M)−ktrace(M)^2
-
-    '''
-    # 1. get difference image
-    Ix[Ix<torch.max(Ix)*0.1]=0
-    Iy[Iy<torch.max(Iy)*0.1]=0
-    Iy[It<torch.max(It)*0.1]=0
-    grad_norm = (Ix**2 + Iy**2+ It**2)**0.5 + 1e-9
-    Ix = Ix / torch.max(grad_norm)
-    Iy = Iy / torch.max(grad_norm)
-    It = It / torch.max(grad_norm)
-    
-    # 3. sober filtering
-    A = Ix * Ix
-    B = Iy * Iy
-    C = It * It
-    D = Ix * Iy
-    E = Ix * It
-    F = Iy * It
-    
-    size = int(size)
-    if size % 2 == 0:
-        size = size + 1
-    m = (size - 1) / 2
-    y, x = torch.meshgrid(torch.arange(-m, m + 1), torch.arange(-m, m + 1))
-    kernel = torch.exp(-(x * x + y * y) / (2 * sigma * sigma))
-    kernel = kernel / torch.sum(kernel)
-    kernel = kernel.unsqueeze(0).unsqueeze(0)
-    A = gaussian_smooth(A.unsqueeze(0).unsqueeze(0), kernel).squeeze(0).squeeze(0)
-    B = gaussian_smooth(B.unsqueeze(0).unsqueeze(0), kernel).squeeze(0).squeeze(0)
-    C = gaussian_smooth(C.unsqueeze(0).unsqueeze(0), kernel).squeeze(0).squeeze(0)
-    D = gaussian_smooth(D.unsqueeze(0).unsqueeze(0), kernel).squeeze(0).squeeze(0)
-    E = gaussian_smooth(E.unsqueeze(0).unsqueeze(0), kernel).squeeze(0).squeeze(0)
-    F = gaussian_smooth(F.unsqueeze(0).unsqueeze(0), kernel).squeeze(0).squeeze(0)
-    
-    # 4. corner detect
-    detM = A*B*C+2*D*E*F
-    traceM = A+B+C-A*D*D-B*E*E-C*F*F
-    R = detM - k * traceM ** 2
-    threshold =  float(torch.max(R)) * th
-    idmap = R >= threshold
-    return idmap
-
-
-
+    corner_list = []
+    for i in range(R.shape[0]):
+        for j in range(R.shape[1]):
+            if R[i,j] > th:
+                i_min = max(i-nmsSize//2,0)
+                i_max = min(i+nmsSize//2,R.shape[0]-1)
+                j_min = max(j-nmsSize//2,0)
+                j_max = min(j+nmsSize//2,R.shape[1]-1)
+                neibor = R[i_min:i_max,j_min:j_max]
+                if R[i,j] >= torch.max(neibor)-1e-5:
+                    corner_list.append((i,j))
+    return corner_list
 
 #===============================================================
 # ******HOG****** 
@@ -269,57 +211,166 @@ def hog(Ix:torch.Tensor,Iy:torch.Tensor,kplist:list):
 
 
 #===============================================================
-# ******简化版SIFT中的描述子，缺少多尺度****** 
+# ******steadyHarrisCornerForSIFT****** 
 # ===============================================================
-def sift(Ix:torch.Tensor,Iy:torch.Tensor, keypoints:list):
-    '''
-    **简化版SIFT中的描述子，缺少多尺度**
-    
-    parameter:
-        :param Ix: x方向梯度,[h,w],torch.Tensor
-        :param Iy: y方向梯度,[h,w],torch.Tensor
-        :param keypoints: list of [x,y] 需要sift的坐标list, list
 
-    '''
-    Ix = Ix.numpy().astype(np.float32)
-    Iy = Iy.numpy().astype(np.float32)
-    # 定义圆形区域的半径
-    radius = 13
-    descriptors = []
-    count = 0
-    # 获取关键点坐标
-    goofkp = []
-    for kp in keypoints:
-        descriptorlist = []
-        y, x = int(kp[0]), int(kp[1])
-        Xneighbor = Ix[y-1:y+2,x-1:x+2]
-        Yneighbor = Iy[y-1:y+2,x-1:x+2]
-        mask = (Xneighbor!=0) & (Yneighbor!=0)
-        magnitude, majorAngle = cv2.cartToPolar(Xneighbor[mask],Yneighbor[mask], angleInDegrees=True)
-        if majorAngle is None:
-            continue
-        majorAngle = np.mean(majorAngle)
-        magnitude = np.mean(magnitude)
+def steadyHarrisCornerForSIFT(Ix:torch.Tensor,Iy:torch.Tensor,num_levels = 6, thresh = 0.1,k = 0.1,size=5,sigma=1,nmsSize=11):
         
-        # 选取圆形区域
-        pIx = Ix[y - radius : y + radius, x - radius : x + radius]
-        pIy = Iy[y - radius : y + radius, x - radius : x + radius]
-        shapeofIxy = pIx.shape
-        if shapeofIxy[0] < radius*2 or shapeofIxy[1] < radius*2 :
-            continue
-        # 将圆形区域分成16个子块
-        step = int(radius/2)
+    corner_list_pyramid = []
+    current_shape = Ix.shape
+
+    for i in range(num_levels):
+
+        corner_list = HarrisCorner(Ix, Iy, thresh = thresh, k = k, size=size, sigma=sigma, nmsSize=nmsSize)
+
+        corner_list = [(kp[0],kp[1]) for kp in corner_list]
+
+        corner_list_pyramid.append(corner_list)
+        
+        if current_shape[0] > 1 or current_shape[1] > 1:
+            # Use the 'valid' option to prevent zero-padding
+            Ix = F.interpolate(Ix.unsqueeze(0).unsqueeze(0), 
+                               size=(current_shape[1] // 2, current_shape[0] // 2), mode='bilinear').squeeze(0).squeeze(0)
+            Iy = F.interpolate(Iy.unsqueeze(0).unsqueeze(0), 
+                               size=(current_shape[1] // 2, current_shape[0] // 2), mode='bilinear').squeeze(0).squeeze(0)
+            current_shape = Ix.shape
+
+    final_corner_list = []
+    for i in range(num_levels):
+        current_corner_list = corner_list_pyramid[i]
+        neibor_list = []
+        if i > 0:
+            neibor_list += corner_list_pyramid[i-1]
+            for kp in current_corner_list:
+                for kp_match in neibor_list:
+                    if (kp[0]-kp_match[0])**2 + (kp[1]-kp_match[1])**2 < 4:
+                        final_corner_list.append((kp[1],kp[0],i+1))
+        if i < num_levels-1:
+            neibor_list += corner_list_pyramid[i+1]
+            for kp in current_corner_list:
+                for kp_match in neibor_list:
+                    if (kp[0]-kp_match[0])**2 + (kp[1]-kp_match[1])**2 < 4:
+                        final_corner_list.append((kp[1],kp[0],i+1))
+       
+    print('[tianmoucv.steadyHarrisCornerForSIFT]Steady KP for SIFT:',len(final_corner_list))
+
+    return final_corner_list
+
+
+#===============================================================
+# ******SIFT****** 
+# ===============================================================
+
+
+def compute_multiscale_sift_descriptor(Ix:torch.Tensor, Iy:torch.Tensor, kp_list: list, num_levels = 6):
+    """
+    计算 Harris 角点的 SIFT 特征描述子
+    
+    Args:
+        Ix (Tensor): x 方向的梯度张量
+        Iy (Tensor): y 方向的梯度张量
+        kp_list (list): 每个元素为 (x, y, level) 的角点列表
+        
+    Returns:
+        descriptors: 包含每个角点 SIFT 描述子的列表，形状为 [num_kp, 128]
+    """
+    # 定义参数
+    bin_size = 4      # 每个方向直方图的小块大小
+    hist_bins = 8     # 方向直方图的 bins 数量
+    descriptor_size = 16*8  # 最终描述子长度
+    
+    # 将角点列表转换为张量
+    kps = torch.tensor(kp_list, dtype=torch.float32)
+
+    grad_angle_list = []
+    grad_magnitude_list = []
+
+    current_shape = Ix.shape
+
+    Ix_ = Ix.clone()
+    Iy_ = Iy.clone()
+    
+    for i in range(num_levels):
+        # 计算梯度方向和幅度
+        grad_angle = torch.atan2(Iy, Ix)  # 归一化到 [-pi, pi]
+        grad_magnitude = torch.sqrt(Ix**2 + Iy**2)
+        
+        grad_angle_list.append(grad_angle)
+        grad_magnitude_list.append(grad_magnitude)
+
+        if current_shape[0] > 1 or current_shape[1] > 1:
+            # Use the 'valid' option to prevent zero-padding
+            Ix_= F.interpolate(Ix_.unsqueeze(0).unsqueeze(0), 
+                               size=(current_shape[1] // 2, current_shape[0] // 2), mode='bilinear').squeeze(0).squeeze(0)
+            Iy_ = F.interpolate(Iy_.unsqueeze(0).unsqueeze(0), 
+                               size=(current_shape[1] // 2, current_shape[0] // 2), mode='bilinear').squeeze(0).squeeze(0)
+            current_shape = Ix.shape
+    
+    descriptors = []
+    kplist = []
+
+    for i, (x, y, level) in enumerate(kp_list):
+
+        # 提取周围区域的梯度信息
+        grad_angle = grad_angle_list[level-1]
+        grad_magnitude = grad_magnitude_list[level-1]
+        
+        region_angle = grad_angle[y - bin_size//2 : y + bin_size//2,
+                                  x - bin_size//2 : x + bin_size//2]
+        region_magnitude = grad_magnitude[y - bin_size//2 : y + bin_size//2,
+                                          x - bin_size//2 : x + bin_size//2]
+        # 转换到整数坐标
+        x = int(round(x))
+        y = int(round(y))
+        
+        # 检查边界条件
+        if x < bin_size or y < bin_size or \
+           x + bin_size > grad_angle.size(1) or y + bin_size > grad_angle.size(0):
+            continue  # 跳过边缘点
+            
+        # 创建方向直方图
+        hist = torch.zeros(hist_bins, device=Ix.device)
+        cell_size = bin_size // 2
+        
+        for dy in range(cell_size):
+            for dx in range(cell_size):
+                # 计算每个小块的梯度方向和幅度
+                angles = region_angle[dy*cell_size : (dy+1)*cell_size,
+                                     dx*cell_size : (dx+1)*cell_size]
+                magnitudes = region_magnitude[dy*cell_size : (dy+1)*cell_size,
+                                            dx*cell_size : (dx+1)*cell_size]
+                
+                # 将角度归一化为 0-360 度
+                angles = torch.fmod(angles + math.pi, 2*math.pi) * (180/math.pi)
+                
+                # 统计每个方向的幅度贡献
+                for a, m in zip(angles.flatten(), magnitudes.flatten()):
+                    bin_idx = int((a % 360) // (360/hist_bins))
+                    hist[bin_idx] += m
+                    
+        # 归一化直方图
+        if torch.sum(hist) > 1e-8:
+            hist /= torch.sum(hist)
+            
+        # 将直方图扩展为 128 维描述子
+        descriptor = []
         for i in range(4):
             for j in range(4):
-                # 计算子块内像素的梯度方向和梯度强度
-                dx = pIx[i * step : (i + 1) * step, j * step : (j + 1) * step]
-                dy = pIy[i * step : (i + 1) * step, j * step : (j + 1) * step]
-                magnitude, angle = cv2.cartToPolar(dx, dy, angleInDegrees=True)
-                hist, _ = np.histogram(angle-majorAngle, bins=4, range=(0, 360), weights=magnitude)
-                descriptorlist.append(torch.Tensor(hist))
-        if(len(descriptorlist)>0):
-            descriptors.append(torch.stack(descriptorlist,dim=0))
-            count += 1
-            goofkp.append(kp)
+                start_idx = (i*hist_bins//4 + j) % hist_bins
+                end_idx = (start_idx + hist_bins//4) % hist_bins
+                if start_idx < end_idx:
+                    descriptor += hist[start_idx:end_idx].tolist()
+                else:
+                    descriptor += torch.cat([hist[start_idx:], hist[:end_idx]]).tolist()
+                    
+        # 归一化描述子
+        descriptor = torch.tensor(descriptor)
+        descriptor /= torch.norm(descriptor) + 1e-8
+        if torch.max(descriptor) > 0.2:
+            descriptor *= (0.2 / torch.max(descriptor))
+            
+        descriptors.append(descriptor)
+        kplist.append([x*2**(level-1),y*2**(level-1)])
+    
+    return descriptors,kplist
 
-    return goofkp,descriptors

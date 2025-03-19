@@ -369,56 +369,68 @@ def demosaicing_npy(bayer=None, bayer_pattern='bggr', level=0 ,bitdepth=8):
 # 可视化差分数据
 # bg_color:white/black
 # ===============================================================
-def vizDiff(diff,thresh=0,bg_color='white'):
-
+def vizDiff(diff,thresh=0,bg_color='white',gain=1):
+    assert len(diff.shape)==2
+    assert isinstance(diff,torch.Tensor)
     if bg_color == 'white':
-        return vizDiff_WBG(diff,thresh=thresh)
+        return vizDiff_WBG(diff,thresh=thresh,gain=gain)
     if bg_color == 'black':
-        return vizDiff_BBG(diff,thresh=thresh)
+        return vizDiff_BBG(diff,thresh=thresh,gain=gain)
+    if bg_color == 'gray':
+        return vizDiff_GRY(diff,thresh=thresh,gain=gain)
     else:
-        print('not implemented,bg_color:white/black')
+        print('not implemented,bg_color can be white/black/gray')
         return None
     return rgb_diff
     
 # ===============================================================
 # 可视化差分数据(白底)
 # ===============================================================
-def vizDiff_WBG(diff,thresh=0):
-    rgb_diff = 0
-    w = h = 0
-    if len(diff.shape)==2:
-        w,h = diff.shape
-    else:
-        diff = diff[...,0]
-        w,h = diff.shape
-        
+def vizDiff_WBG(diff,thresh=0,gain=1):
+    if torch.max(diff) < 1:
+        diff = diff * 255
+    diff_vis = diff.clip_(min=-255, max=255)
+    w,h = diff.shape
     rgb_diff = torch.ones([3,w,h]) * 255
     diff[abs(diff)<thresh] = 0
+    diff = diff * gain
+
     rgb_diff[0,...][diff>0] = 0
     rgb_diff[1,...][diff>0] = diff[diff>0]
     rgb_diff[2,...][diff>0] = diff[diff>0]
     rgb_diff[0,...][diff<0] = -diff[diff<0]
     rgb_diff[1,...][diff<0] = 0
     rgb_diff[2,...][diff<0] = -diff[diff<0]
-    return rgb_diff
+    return rgb_diff.permute(1,2,0)
 
 
 # ===============================================================
 # 可视化差分数据(黑底)
 # ===============================================================
-def vizDiff_BBG(diff,thresh=0):
-    rgb_diff = 0
-    w = h = 0
-    if len(diff.shape)==2:
-        w,h = diff.shape
-    else:
-        diff = diff[...,0]
-        w,h = diff.shape
-        
+def vizDiff_BBG(diff,thresh=0,gain=1):
+    if torch.max(diff) < 1:
+        diff = diff * 255
+    diff_vis = diff.clip_(min=-255, max=255)
+    w,h = diff.shape
     rgb_diff = torch.zeros([3,w,h])
     diff[abs(diff)<thresh] = 0
+    diff = diff * gain
+
     rgb_diff[1,...][diff>0] = diff[diff>0]
     rgb_diff[2,...][diff<0] = -diff[diff<0]
-    
-    return rgb_diff
+    return rgb_diff.permute(1,2,0)
 
+# ===============================================================
+# 可视化差分数据(灰底)
+# ===============================================================
+def vizDiff_GRY(diff,thresh=0,gain=1):
+    w,h = diff.shape
+    if torch.max(diff) < 1:
+        diff = diff * 128
+    diff_vis = diff.clip_(min=-127, max=127)
+    diff[abs(diff)<thresh] = 0
+    diff = diff * gain
+
+    diff_vis = diff_vis + 127
+    diff_vis = torch.stack([diff_vis]*3,dim=-1)
+    return diff_vis

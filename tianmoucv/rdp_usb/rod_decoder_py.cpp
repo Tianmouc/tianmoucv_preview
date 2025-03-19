@@ -1262,6 +1262,7 @@ int usbfmt_get_one_rod_fullinfo(const std::string &fpath, uint64_t frm_start_pos
     int *pvalue = (int *)calloc(frame_size , sizeof(int));
     fin.read((char *) pvalue, frame_size * sizeof(int));
     fin.close();
+    // printf("frame size %d\n", frame_size);
     py::buffer_info td_buf = temp_diff_np.request();
     py::buffer_info sd_l_buf = spat_diff_left_np.request();
     py::buffer_info sd_r_buf = spat_diff_right_np.request();
@@ -1350,6 +1351,226 @@ int usbfmt_get_one_cone_fullinfo(const std::string &fpath, uint64_t frm_start_po
     return 0;
 }
 
+         std::vector<uint32_t> g_packets(int8_t* row_ptr, int row_addr, int width, uint32_t adc_bit_prec, int mode, uint32_t* eff_grp_num){
+            // mode 0 for TD, mode 1 for SDL, mode 2 for SDR
+            int data_per_grp = 16 / adc_bit_prec;
+            std::vector<uint> g_pkts;
+            uint8_t div = 1;
+            switch (adc_bit_prec)
+            {
+                case 2:
+                    div = 127;
+                    break;
+                case 4:
+                    div = 16;
+                    break;
+                case 8:
+                    div = 1;
+                    break;
+                default:
+                    break;
+                } 
+           // uint32_t eff_grp_num = 0;
+            if(adc_bit_prec == 8 || adc_bit_prec == 4){
+                for(auto x = 0; x < width; x += data_per_grp){
+                    uint16_t pixfull = 0;
+                    for(auto px = 0; px < data_per_grp; px++){
+                        int8_t pix = row_ptr[x + px];
+                        uint8_t pix_u8 = (uint8_t) pix / div;
+                        pixfull = (pixfull << adc_bit_prec) | pix_u8;
+                        // printf("%d, %d, %x\n", pix, pixfull, pixfull);
+                    }
+                    if (pixfull != 0){
+                        uint8_t xaddr =  (x / data_per_grp) & 0x7f;
+                        uint32_t gpkt_this = (1 << 31) + (xaddr << 24) + (pixfull << 8) + 0xff;
+                        g_pkts.push_back(gpkt_this);
+                        *eff_grp_num += 1;
+                    }else{
+                        continue;
+                    }
+                }
+
+                if(eff_grp_num != nullptr){
+                    uint8_t header = 0;
+                    switch (mode)
+                    {
+                    case 0:
+                        header = 0x10;
+                        break;
+                    case 1:
+                        header = 0x14;
+                        break;
+                    case 2:
+                        header = 0x16;
+                        break;
+                    default:
+                        break;
+                    } 
+                    uint32_t row_pkt = (header << 24) + (((*eff_grp_num) & 0x7f) << 17) + ((row_addr & 0xff) << 8) + 0xff;
+                    g_pkts.emplace(g_pkts.begin(), row_pkt);
+                    
+                }
+
+            } else if(adc_bit_prec == 2){
+                data_per_grp = 12;
+                int data_per_grp_last = 4;
+                for(auto x = 0; x < width  ; x += data_per_grp){
+                    uint32_t pixfull = 0;
+                    if (x < width - data_per_grp_last){
+                        for(auto px = 0; px < data_per_grp; px++){
+                            int8_t pix = row_ptr[x + px]/ div;
+                            uint8_t pix_u8 = (uint8_t) pix & 0x3;
+                            pixfull = (pixfull << adc_bit_prec) | pix_u8;
+                            // printf("%d, %x, %x;", pix, pix_u8, pixfull);
+                        }
+                        // printf("\n");
+                    }else{
+                        //  printf("goto last\n");
+                        for(auto px = 0; px < data_per_grp_last; px++){
+                            int8_t pix = row_ptr[x + px] / div;
+                            uint8_t pix_u8 = (uint8_t) pix & 0x3;
+                            pixfull = (pixfull << adc_bit_prec) | pix_u8;
+                            // printf("%d, %x;", pix, pixfull, pixfull);
+                        }
+                        //  printf("\n");
+                        pixfull = pixfull << 16;
+                    }
+    
+                    if (pixfull != 0){
+                        pixfull = pixfull & 0xFFFFFF;
+                        uint8_t xaddr =  (x / data_per_grp) & 0x1f;
+                        uint32_t gpkt_this = (1 << 31) + (xaddr << 26) + (pixfull << 2) + 0x3;
+                        g_pkts.push_back(gpkt_this);
+                        *eff_grp_num += 1;
+                    }else{
+                        continue;
+                    }
+                }
+
+                if(eff_grp_num != nullptr){
+                    uint8_t header = 0;
+                    switch (mode)
+                    {
+                    case 0:
+                        header = 0x10;
+                        break;
+                    case 1:
+                        header = 0x14;
+                        break;
+                    case 2:
+                        header = 0x16;
+                        break;
+                    default:
+                        break;
+                    } 
+                    uint32_t row_pkt = (header << 24) + (((*eff_grp_num) & 0x7f) << 17) + ((row_addr & 0xff) << 8) + 0x3;
+                    g_pkts.emplace(g_pkts.begin(), row_pkt);
+                    
+                }
+
+               // int x =
+
+            }
+            
+            else{
+                printf("Do not support this mode now, sorry \n");
+                exit(-1);
+            }
+            return g_pkts;
+        }
+        std::vector<uint32_t> rod_encoder(int8_t* tdiff, int8_t* sdiff_l, int8_t* sdiff_r, int w, int h, int* header, uint32_t old_pkt_frm){
+            uint32_t adc_bit_prec = (uint)header[FRM_HEAD_ADC_PREC_OFFSET] & 0xff;
+            uint32_t frm_cnt = (uint)header[FRM_HEAD_FrmCount_OFFSET] & 0xffff;
+            std::vector<uint32_t> pkts;
+            int data_per_grp = 16 / adc_bit_prec;
+            int data_per_grp_2bit_norm = 12;
+            int data_per_grp_2bit_last = 4; 
+            pkts.insert(pkts.end(), header, header + 16);
+            pkts.push_back(old_pkt_frm);
+            int width = w;
+            // assert tdiff.cols == sdiff_l.cols;
+            // first two rows of TD 
+            for(auto y = 0; y < 2; y++){
+                int8_t* row_ptr = tdiff + y * width; // tdiff.ptr<int8_t>(y);
+                int row_addr =  y;
+                uint32_t eff_grp_num = 0;
+                std::vector<uint32_t> g_pkts = g_packets(row_ptr,row_addr, width, adc_bit_prec, 0, &eff_grp_num);
+                if(eff_grp_num > 0){
+                    pkts.insert(pkts.end(), g_pkts.begin(), g_pkts.end());
+                }
+            }
+
+            // for TD Row 2 ~ TD row 159 <---> SD Row 0 ~ SD row 157
+            for(auto y = 0; y < h-2; y++){
+
+                int rowaddr_td = y + 2;
+                uint32_t eff_grp_num_td = 0;
+                int8_t* row_ptr_td =tdiff + rowaddr_td * width; //  tdiff.ptr<int8_t>(rowaddr_td);
+                std::vector<uint32_t> g_pkts_td = g_packets(row_ptr_td,rowaddr_td, width, adc_bit_prec, 0, &eff_grp_num_td);
+                if(eff_grp_num_td > 0){
+                    pkts.insert(pkts.end(), g_pkts_td.begin(), g_pkts_td.end());
+                }
+
+                int rowaddr_sd = y;
+                uint32_t eff_grp_num_sdl = 0;
+                int8_t* row_ptr_sdl = sdiff_l + rowaddr_sd * width;// sdiff_l.ptr<int8_t>(rowaddr_sd);
+                std::vector<uint32_t> g_pkts_sdl = g_packets(row_ptr_sdl,rowaddr_sd, width, adc_bit_prec,1, &eff_grp_num_sdl);
+                if(eff_grp_num_sdl > 0){
+                    pkts.insert(pkts.end(), g_pkts_sdl.begin(), g_pkts_sdl.end());
+                }
+
+                uint32_t eff_grp_num_sdr = 0;
+                int8_t* row_ptr_sdr = sdiff_r + rowaddr_sd * width;//.ptr<int8_t>(rowaddr_sd);
+                std::vector<uint32_t> g_pkts_sdr = g_packets(row_ptr_sdr,rowaddr_sd, width, adc_bit_prec, 2, &eff_grp_num_sdr);
+                if(eff_grp_num_sdr > 0){
+                    pkts.insert(pkts.end(), g_pkts_sdr.begin(), g_pkts_sdr.end());
+                }
+
+            }
+
+            // for last SD row
+            int rowaddr_sd = h-2;
+            uint32_t eff_grp_num_sdl = 0;
+            int8_t* row_ptr_sdl = sdiff_l + rowaddr_sd * width;//.ptr<int8_t>(rowaddr_sd);
+            std::vector<uint32_t> g_pkts_sdl = g_packets(row_ptr_sdl,rowaddr_sd, width, adc_bit_prec, 1, &eff_grp_num_sdl);
+            if(eff_grp_num_sdl > 0){
+                pkts.insert(pkts.end(), g_pkts_sdl.begin(), g_pkts_sdl.end());
+            }
+
+            uint32_t eff_grp_num_sdr = 0;
+            int8_t* row_ptr_sdr = sdiff_r+ rowaddr_sd * width;//.ptr<int8_t>(rowaddr_sd);
+            std::vector<uint32_t> g_pkts_sdr = g_packets(row_ptr_sdr,rowaddr_sd, width, adc_bit_prec, 2, &eff_grp_num_sdr);
+            if(eff_grp_num_sdr > 0){
+                pkts.insert(pkts.end(), g_pkts_sdr.begin(), g_pkts_sdr.end());
+                // at last, push a end-of-pkt 
+                pkts.push_back(0xffffffff);
+                
+
+            }
+            return pkts;
+        }
+
+py::array_t<uint32_t> rod_encoder_from_np(py::array_t<int8_t>& temp_diff_np, py::array_t<int8_t>&spat_diff_left_np, py::array_t<int8_t>& spat_diff_right_np, py::array_t<int>& header, uint32_t old_pkt_first_pkt,  int height, int width){
+    py::buffer_info td_buf = temp_diff_np.request();
+    py::buffer_info sd_l_buf = spat_diff_left_np.request();
+    py::buffer_info sd_r_buf = spat_diff_right_np.request();
+    py::buffer_info header_buf = header.request();
+
+    int8_t* td_ptr = (int8_t*) td_buf.ptr;
+    int8_t* sd_l_ptr = (int8_t*) sd_l_buf.ptr;
+    int8_t* sd_r_ptr = (int8_t*) sd_r_buf.ptr;
+    int* header_ptr = (int*) header_buf.ptr;
+
+    std::vector<uint32_t> pkts = rod_encoder(td_ptr, sd_l_ptr, sd_r_ptr, width, height, header_ptr, old_pkt_first_pkt);
+    py::array_t<uint32_t> result(pkts.size());
+    auto result_buffer = result.request();
+    int *result_ptr = static_cast<int *>(result_buffer.ptr);
+
+    // 将数据复制到 numpy 数组中
+    std::copy(pkts.begin(), pkts.end(), result_ptr);
+     return result;
+
+}
 
 bool compareFileName(const std::string& a, const std::string& b) {
     // 提取真实序号
@@ -1661,6 +1882,7 @@ PYBIND11_MODULE(rod_decoder_py, m){
      m.def("get_one_cone_fullinfo", &usbfmt_get_one_cone_fullinfo, "USB format get one cone frame with full info");
     m.def("rod_pcie2usb_conv", &rod_compact_pcie2usb, "Convert Rod PCIE data to USB data format");
     m.def("cone_pcie2usb_conv", &cone_compact_pcie2usb, "Convert Cone PCIE data to USB data format");
+    m.def("rod_encoder_np", &rod_encoder_from_np, "rod_encoder_from_np");
 
   
 }

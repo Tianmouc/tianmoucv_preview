@@ -6,7 +6,7 @@ from scipy.optimize import linear_sum_assignment
 # ******描述子匹配****** 
 # ===============================================================
 #ratio=0.85:knn中前两个匹配的距离的比例
-def feature_matching(des1, des2, ratio=0.85):
+def feature_matching(des1:np.array, des2:np.array, ratio=0.85):
     """
     Match SIFT descriptors between two images.
     
@@ -17,7 +17,7 @@ def feature_matching(des1, des2, ratio=0.85):
 
     """
     bf = cv2.BFMatcher()
-    matches = bf.knnMatch(des1.cpu().numpy(), des2.cpu().numpy(), k=2)
+    matches = bf.knnMatch(des1, des2, k=2)
     good_matches = []
     if len(matches) > 0:
         for m,n in matches:

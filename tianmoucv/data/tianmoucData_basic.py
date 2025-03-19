@@ -262,7 +262,7 @@ class TianmoucDataReader_basic():
                             if rod_adc_precision == 8 and rod_mode == 1:
                                 rodfilepersample = 25
                             if rod_adc_precision == 4 and rod_mode == 0:
-                                rodfilepersample = 110
+                                rodfilepersample = 100
                             if rod_adc_precision == 4 and rod_mode == 1:
                                 rodfilepersample = 50    
                             if rod_adc_precision == 2 and rod_mode == 0:
@@ -502,6 +502,13 @@ class TianmoucDataReader_basic():
         sample['labels'] = legalSample['labels']
         sample['sysTimeStamp'] = legalSample['sysTimeStamp']
         sample['dataRatio']= dataRatio
+
+        #convert all numpy type to tensor
+        for key in sample:
+            value = sample[key]
+            if isinstance(value,np.ndarray):
+                sample[key] = torch.FloatTensor(value)
+        
         return sample
     
     def HDRRecon(self,SD,F0):

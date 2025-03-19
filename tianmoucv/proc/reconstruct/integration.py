@@ -5,7 +5,6 @@ import torch.nn.functional as F
 import os
 import time
 
-from .basic import laplacian_blending
 from tianmoucv.isp import SD2XY,upsampleTSD
 
 def TD_integration(tsdiff,F0,F1,t, TD_BG_NOISE = 0, threshGate=4/255, dig_scaling= 1.5):
@@ -16,9 +15,7 @@ def TD_integration(tsdiff,F0,F1,t, TD_BG_NOISE = 0, threshGate=4/255, dig_scalin
     
     2. 计算AOP到COP的线性缩放系数
     
-    3. laplacian_blending
-    
-    4. 双向TD积累+SD灰度合成最终结果
+    3. 双向TD积累+SD灰度合成最终结果
     
     parameter:
         :param F0: [h,w,3],torch.Tensor

@@ -93,3 +93,32 @@ class TianmoucOF_SpyNet(nn.Module):
         frameTime = etime - stime
         print(1/frameTime, 'fps')
         return Flow_1_0
+
+
+    @torch.no_grad() 
+    def forward(self,TD_0_t: torch.Tensor,SD0: torch.Tensor,SD1: torch.Tensor,print_fps = True):
+        '''
+        Args:
+          @tsdiff: [c,n,w,h], -1~1,torch，decoder的输出直接concate的结果
+          
+          @t1,t2 \in [0,n]  calculate the OF between t1-t2
+          
+        '''
+        for param in self.flowComp.parameters():
+            self.device = param.device
+            break
+        if len(TD_0_t.shape)==3:
+            TD_0_t = TD_0_t.unsqueeze(0)
+            SD0 = SD0.unsqueeze(0)
+            SD1 = SD1.unsqueeze(0)
+
+        TD_t_0 = -1 * TD_0_t 
+        # Part1. warp
+        stime = time.time()
+        flow_init = None
+        Flow_1_0 = self.flowComp(TD_t_0.to(self.device), SD0.to(self.device), SD1.to(self.device)) #输出值0~1
+        etime = time.time()
+        frameTime = etime - stime
+        if print_fps:
+            print(1/frameTime, 'batch/fps')
+        return Flow_1_0

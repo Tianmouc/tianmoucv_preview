@@ -7,6 +7,7 @@ AWB is applied to raw mosaiced images.
 """
 from enum import Enum
 import numpy as np
+from .weightedGE import weightedGE_apply
 
 # ===============================================================
 # 白平衡调整——灰度世界假设
@@ -77,7 +78,10 @@ class AutoWhiteBalance:
             self.wb_gain = self.apply_pca_based_method(r, g, b, saturation_mask)
         if method == 'GW':
             self.wb_gain = self.apply_GW_method(r, g, b)
-
+        if method == 'GE':
+            self.wb_gain = self.apply_GE_method(r, g, b)
+            print('[develop warnining]apply_GE_method need test in tianmoucv/isp/awb.py')
+            
         awb_mosaic_img = raw_mosaic_img.copy().astype(np.float32)
         awb_mosaic_img[::2, ::2] = b * self.wb_gain[0]
         awb_mosaic_img[::2, 1::2] = gr * self.wb_gain[1]
@@ -95,7 +99,18 @@ class AutoWhiteBalance:
 
         Kb, Kg, Kr = K / (B_ave+1e-8), K / (G_ave+1e-8), K / (R_ave+1e-8)
         
-        return np.array([Kb,Kg,Kr])
+        return [Kb,Kg,Kr]
+    
+    
+    def apply_GE_method(self,R,G,B):
+        
+        input_image = np.zeros((R.shape[0], R.shape[1], 3))
+        input_image[:, :, 0] = R
+        input_image[:, :, 1] = G
+        input_image[:, :, 2] = B
+        Kb,Kg,Kr = weightedGE(input_image, kappa=5, mink_norm=2, sigma=2)
+    
+        return [Kb,Kg,Kr]
 
 
     def apply_pca_based_method(

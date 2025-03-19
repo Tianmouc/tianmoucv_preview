@@ -34,7 +34,7 @@ pip install tianmoucv
 ```bash
 git clone git@github.com:Tianmouc/Tianmoucv_preview.git
 cd Tianmoucv_preview
-sh install.sh
+pip install .
 ```
 
 ## Data

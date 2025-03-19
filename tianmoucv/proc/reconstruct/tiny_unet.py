@@ -5,23 +5,24 @@ import torch.nn.functional as F
 import os
 import time
 
-from .basic import laplacian_blending
+from .basic import batch_inference
 
 from tianmoucv.tools import check_url_or_local_path,download_file
-from tianmoucv.proc.nn.unet_modules import UNetRecon
 from tianmoucv.isp import upsampleTSD
-from tianmoucv.proc.nn.utils import tdiff_split
+from tianmoucv.proc.nn.utils import tdiff_split,spilt_and_adjust_td_batch
+from tianmoucv.proc.nn.unet_modules import UNetRecon
 
 class TianmoucRecon_tiny(nn.Module):
     '''
-    重建网络 updated direct 2024-05-15
+    重建网络 updated direct 2024-08-19
     '''
     def __init__(self,ckpt_path =None,_optim=True):
         super(TianmoucRecon_tiny, self).__init__()
         current_dir=os.path.dirname(__file__)
         
         if ckpt_path is None:
-            ckpt_path = 'http://www.tianmouc.cn:38328/index.php/s/f8kQfHNZkrnKABd/download/direct2024-05-15_extreme_31.7.ckpt'
+            ckpt_path = 'http://www.tianmouc.cn:38328/index.php/s/TzRQN96sq3Ag7EP/download/direct2024-08-19_extreme_32.7.ckpt'
+            
         self.reconNet =  UNetRecon(7, 3)
         status = check_url_or_local_path(ckpt_path)
         print('loading..:',ckpt_path)
@@ -54,80 +55,54 @@ class TianmoucRecon_tiny(nn.Module):
             self.reconNet = torch.compile(self.reconNet)
             print('compiled!')
 
-    def __call__(self, F0, tsdiff, t):
-        if t == -1:
-            return self.forward_batch_direct(F0,tsdiff).float()
+    
+    def __call__(self, sample, w=640,h=320,ifSingleDirection=False, bs=32):
+        if ifSingleDirection:
+            return self.forward_batch_direct(sample,bs=bs, w=w,h=h).float()
         else:
-            return self.forward_single_t(F0, tsdiff, t).float()
+            return self.forward_batch_dual(sample,bs=bs, w=w,h=h).float()
 
     @torch.no_grad() 
-    def forward_single_t(self, F0, tsdiff, t):
-        '''
-          recontruct a frame
-          
-          @tsdiff: [c,n,w,h], -1~1,torch
-          
-          @F0:   [w,h,c],torch
-          
-          @t \in [0,n]
-        '''
-        self.device = self.reconNet.up5.conv2.weight.device
-        
-        F0 = F0.permute(2,0,1)
-        c,h,w = F0.shape
-        c2,n2,h2,w2 = tsdiff.shape
-        if h!=h2:
-            tsdiff = upsampleTSD(tsdiff)
-            tsdiff = F.interpolate(tsdiff, size=(h,w), mode='bilinear')
-            
-        F0 = F0.unsqueeze(0).to(self.device)
-        tsdiff = tsdiff.unsqueeze(0).to(self.device)
-            
-        SD1 = tsdiff[:,1:,t,...]
-        TD_0_t = tsdiff[:,0:1,1:t,...]
-        
-        TD_0_t = tdiff_split(TD_0_t,cdim=1)#splie pos and neg
-
-        I_1_rec = self.reconNet(torch.cat([F0,TD_0_t,SD1],dim=1))#3+1
-
-        return I_1_rec 
-
-    @torch.no_grad() 
-    def forward_batch_direct(self, F0, tsdiff):
+    def forward_batch_direct(self, sample, bs=32, w=640,h=320):
         '''
             recontruct a batch
-            
             @ tsdiff: [c,n,w,h], -1~1,torch
-            
             @ F0:   [w,h,c],torch
         '''
         self.device = self.reconNet.up5.conv2.weight.device
-        F0 = F0.permute(2,0,1)
-        c,h,w = F0.shape
-        c2,n2,h2,w2 = tsdiff.shape
-        if h!=h2:
-            tsdiff = upsampleTSD(tsdiff)   
-            tsdiff = F.interpolate(tsdiff, size=(h,w), mode='bilinear')
-
-        F0 = F0.unsqueeze(0).to(self.device)
-        tsdiff = tsdiff.unsqueeze(0).to(self.device)#[b,c,n,w,h]
-            
-        FO_b = torch.stack([F0[0,...]]*n2,dim=0)
-        SD1_b = tsdiff[0,1:,:,...].permute(1,0,2,3)
-
-        TD_0_t_b = torch.zeros([n2,2,h,w]).to(self.device)
-        for n in range(1,n2):
-            td_ = tsdiff[:,0:1,1:n+1,...]
-            td = tdiff_split(td_,cdim=1)
-            TD_0_t_b[n:n+1,...] = td
-        
         stime = time.time()
-        inputTensor = torch.cat([FO_b,TD_0_t_b,SD1_b],dim=1)
-        I_1_rec = self.reconNet(inputTensor)#3+1
+        Ft = batch_inference(sample,self.forward_batch,
+                    model='direct',
+                    h=h,
+                    w=w,
+                    device=self.device,
+                    ifsingleDirection=True,
+                    speedUpRate = 1, bs=bs)
         etime = time.time()
-        frameTime = (etime-stime)/n2
-        print(1/frameTime/n2,'batch`ps',1/frameTime, 'fps in average')
-        return I_1_rec 
+        frameTime = (etime-stime)/Ft.shape[0]
+        print(1/frameTime/Ft.shape[0],'batch`ps',1/frameTime, 'fps in average')
+        return Ft 
+
+    @torch.no_grad() 
+    def forward_batch_dual(self,sample,bs=32, w=640,h=320):
+        '''
+            recontruct a batch
+            @ tsdiff: [c,n,w,h], -1~1,torch
+            @ F0:   [w,h,c],torch
+        '''
+        self.device = self.reconNet.up5.conv2.weight.device
+        stime = time.time()
+        Ft = batch_inference(sample,self.forward_batch,
+                    model='direct',
+                    h=h,
+                    w=w,
+                    device=self.device,
+                    ifsingleDirection=False,
+                    speedUpRate = 1, bs=bs)
+        etime = time.time()
+        frameTime = (etime-stime)/Ft.shape[0]
+        print(1/frameTime/Ft.shape[0],'batch`ps',1/frameTime, 'fps in average')
+        return Ft 
 
     @torch.no_grad() 
     def forward_batch(self, F0, TFlow_0_1, SD0, SD1):
@@ -138,10 +113,5 @@ class TianmoucRecon_tiny(nn.Module):
             
             @ F0:   [w,h,c],torch
         '''
-        self.device = self.reconNet.up5.conv2.weight.device
-        stime = time.time()
-        I_1_rec = self.reconNet(torch.cat([F0,TFlow_0_1,SD1],dim=1))#3+1
-        etime = time.time()
-        frameTime = (etime-stime)/n2
-        print(1/frameTime/n2,'batch`ps',1/frameTime, 'fps in average')
-        return I_1_rec 
+        Ft = self.reconNet(torch.cat([F0,TFlow_0_1,SD1],dim=1))#3+1
+        return Ft,0,0,0   
