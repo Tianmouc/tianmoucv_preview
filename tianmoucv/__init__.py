@@ -13,5 +13,5 @@ __author__ = 'Y. Lin'
 __contributor__ = 'T. Wang, Y. Chen, Y. Li'
 __authorEmail__ = '532109881@qq.com'
 
-print('TianMouCV™ 0.3.8.8, via',__author__,' T. Wang & Y. Li add Denoise')
+print('TianMouCV™ 0.3.4.0, via',__author__,' update install logic and nature reconstructor')
 
