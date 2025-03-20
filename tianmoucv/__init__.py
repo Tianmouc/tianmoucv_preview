@@ -13,5 +13,5 @@ __author__ = 'Y. Lin'
 __contributor__ = 'T. Wang, Y. Chen, Y. Li'
 __authorEmail__ = '532109881@qq.com'
 
-print('TianMouCV™ 0.3.4.1, via',__author__,' data reader bug fix')
+print('TianMouCV™ 0.3.4.2, via',__author__,' denoise blc')
 
