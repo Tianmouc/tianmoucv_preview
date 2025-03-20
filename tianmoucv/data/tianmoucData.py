@@ -136,39 +136,36 @@ class TianmoucDataReader(TianmoucDataReader_basic):
     def extraction(self,MAXLEN,uniformSampler):
         for key in self.fileDict:
             new_legalFileList = []
+
             legalFileList = self.fileDict[key]['legalData'] 
             #把相邻N个同步后的包合并为一个sample来读取
             newsample_merge = dict([])
-            accum_count = 1
-            for sampleid in range(len(legalFileList)-1):
+            accum_count = 0
+            for sampleid in range(len(legalFileList)):
                 sample_0 = legalFileList[sampleid]
-                sample_1 = legalFileList[sampleid+1]
-                cone1 = sample_0['coneid']
-                cone2 = sample_1['coneid']
-                if accum_count == 1:
+                cone0 = sample_0['coneid']
+                if accum_count == 0:
                     newsample_merge['sysTimeStamp'] = sample_0['sysTimeStamp']
-                    newsample_merge['coneid'] = cone1
+                    newsample_merge['coneid'] = cone0
                     newsample_merge['rodid'] = sample_0['rodid']
                     newsample_merge[self.pathways[1]] = sample_0[self.pathways[1]]
                     newsample_merge[self.pathways[0]] = sample_0[self.pathways[0]]
                     newsample_merge['labels'] = sample_0['labels'] 
+                else:
+                    newsample_merge['coneid'] += cone0[1:]
+                    newsample_merge['rodid'] += sample_0['rodid'][1:]
+                    newsample_merge[self.pathways[1]] += sample_0[self.pathways[1]][1:]
+                    newsample_merge[self.pathways[0]] += sample_0[self.pathways[0]][1:]
+                    
+                accum_count += 1
+               
                 if accum_count == self.N:
                     new_legalFileList.append(newsample_merge)
                     newsample_merge = dict([])
-                    accum_count = 1
+                    accum_count =0
                     continue
-                #拼接更多的sample，以待一起读取
-                if cone1[1]==cone2[0]:
-                    newsample_merge['coneid'] += cone2[1:]
-                    newsample_merge['rodid'] += sample_1['rodid'][1:]
-                    newsample_merge[self.pathways[1]] += sample_1[self.pathways[1]][1:]
-                    newsample_merge[self.pathways[0]] += sample_1[self.pathways[0]][1:]
-                    accum_count += 1
-                else:
-                    newsample_merge = dict([])
-                    accum_count = 1
-                    continue
-                
+                    #拼接更多的sample，以待一起读取
+
             if MAXLEN>0:
                 if len(new_legalFileList)>MAXLEN:
                     if uniformSampler:
@@ -178,8 +175,9 @@ class TianmoucDataReader(TianmoucDataReader_basic):
                         new_legalFileList  = new_legalFileList[:MAXLEN]
 
             self.fileDict[key]['legalData']  = new_legalFileList
+            
             if self.print_info:
-                print('[tianmoucv Datareader]',key,'extracted length:',len(new_legalFileList))
+                print('[tianmoucv Datareader FULL]',key,'extracted length:',len(new_legalFileList))
 
     #同理，你也可以通过修改这个函数获得更复杂的数据预处理手段
     def packRead(self,idx,key,ifSync =True, needPreProcess = True):
@@ -545,11 +543,7 @@ class TianmoucDataReader(TianmoucDataReader_basic):
             denoise_raw_tsd[:, j, ...]=raw_tsd[:,j,...]
 
         #optional
-        if denoise_function is None:
-            return denoise_raw_tsd
-        else:
-            return denoise_function(raw_tsd,denoise_function_args)
-
+        return denoise_raw_tsd
 
     ##################################################################################################################################
     #>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>[暗噪声标定]<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
