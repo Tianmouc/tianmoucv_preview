@@ -1485,11 +1485,16 @@ int usbfmt_get_one_cone_fullinfo(const std::string &fpath, uint64_t frm_start_po
             int data_per_grp = 16 / adc_bit_prec;
             int data_per_grp_2bit_norm = 12;
             int data_per_grp_2bit_last = 4; 
-            pkts.insert(pkts.end(), header, header + 16);
+            // pkts.insert(pkts.end(), header, header + 16);
             pkts.push_back(old_pkt_frm);
             int width = w;
+            int header_this[16];
+            for(int i = 0; i < 16; i++){
+                header_this[i] = header[i];
+            }
             // assert tdiff.cols == sdiff_l.cols;
             // first two rows of TD 
+            // uint32_t pkt_length = 0;
             for(auto y = 0; y < 2; y++){
                 int8_t* row_ptr = tdiff + y * width; // tdiff.ptr<int8_t>(y);
                 int row_addr =  y;
@@ -1497,6 +1502,7 @@ int usbfmt_get_one_cone_fullinfo(const std::string &fpath, uint64_t frm_start_po
                 std::vector<uint32_t> g_pkts = g_packets(row_ptr,row_addr, width, adc_bit_prec, 0, &eff_grp_num);
                 if(eff_grp_num > 0){
                     pkts.insert(pkts.end(), g_pkts.begin(), g_pkts.end());
+                    // pkt_length
                 }
             }
 
@@ -1547,6 +1553,16 @@ int usbfmt_get_one_cone_fullinfo(const std::string &fpath, uint64_t frm_start_po
                 
 
             }
+            size_t pkt_eff_size = pkts.size();
+            header_this[6] = pkt_eff_size+16;
+            // for(int i = 0; i < 16; i++){
+            //     // header_this[i] = header[i];
+            //     printf("0x%x ", header_this[i]);
+            // }
+            // printf("\n" );
+            // header
+            pkts.insert(pkts.begin(), header_this, header_this + 16);
+
             return pkts;
         }
 
@@ -1562,6 +1578,39 @@ py::array_t<uint32_t> rod_encoder_from_np(py::array_t<int8_t>& temp_diff_np, py:
     int* header_ptr = (int*) header_buf.ptr;
 
     std::vector<uint32_t> pkts = rod_encoder(td_ptr, sd_l_ptr, sd_r_ptr, width, height, header_ptr, old_pkt_first_pkt);
+    py::array_t<uint32_t> result(pkts.size());
+    auto result_buffer = result.request();
+    int *result_ptr = static_cast<int *>(result_buffer.ptr);
+
+    // 将数据复制到 numpy 数组中
+    std::copy(pkts.begin(), pkts.end(), result_ptr);
+     return result;
+
+}
+
+std::vector<uint32_t> cone_encoder(int16_t* raw, int w , int h, int*header){
+    std::vector<uint32_t> cone_values;
+    cone_values.insert(cone_values.end(), header, header + 16);
+    for(int i = 0; i< w * h / 2;i ++){
+        int16_t pix1 = raw[2 * i];
+        int16_t pix2 = raw[2 * i + 1];
+        uint32_t pixfull = 0xFE000000 +  (pix2 << 10) + pix1;
+        cone_values.push_back(pixfull);
+    }
+    cone_values[6] = 0xc810;
+    return cone_values;
+}
+
+py::array_t<uint32_t> cone_encoder_from_np(py::array_t<int16_t>& cone_raw_np,
+     py::array_t<int>& header,  int height, int width){
+    py::buffer_info cone_raw_buf = cone_raw_np.request();
+    py::buffer_info header_buf = header.request();
+
+    int16_t* cone_raw_ptr = (int16_t*) cone_raw_buf.ptr;
+    int* header_ptr = (int*) header_buf.ptr;
+
+    // std::vector<uint32_t> pkts = rod_encoder(td_ptr, sd_l_ptr, sd_r_ptr, width, height, header_ptr, old_pkt_first_pkt);
+    std::vector<uint32_t> pkts = cone_encoder(cone_raw_ptr, width, height, header_ptr);
     py::array_t<uint32_t> result(pkts.size());
     auto result_buffer = result.request();
     int *result_ptr = static_cast<int *>(result_buffer.ptr);
@@ -1883,6 +1932,7 @@ PYBIND11_MODULE(rod_decoder_py, m){
     m.def("rod_pcie2usb_conv", &rod_compact_pcie2usb, "Convert Rod PCIE data to USB data format");
     m.def("cone_pcie2usb_conv", &cone_compact_pcie2usb, "Convert Cone PCIE data to USB data format");
     m.def("rod_encoder_np", &rod_encoder_from_np, "rod_encoder_from_np");
+    m.def("cone_encoder_np", &cone_encoder_from_np, "cone_encoder_from_np");
 
   
 }
