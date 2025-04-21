@@ -36,5 +36,23 @@ __author__ = 'Y. Lin'
 __contributor__ = 'T. Wang, Y. Chen, Y. Li'
 __authorEmail__ = '532109881@qq.com'
 
-print('TianMouCV™ 0.3.4.3, via',__author__,' add codec and bw calculation')
+def limit_threads():
+    import multiprocessing
+    # 获取CPU核心数
+    total_cores = multiprocessing.cpu_count()
+    desired_cores = min(max(1, total_cores // 4),32)
 
+    # 设置环境变量
+    os.environ['OMP_NUM_THREADS'] = str(desired_cores)
+    os.environ['OPENBLAS_NUM_THREADS'] = str(desired_cores)
+    os.environ['MKL_NUM_THREADS'] = str(desired_cores)
+    # 设置OpenCV
+    cv2.setNumThreads(desired_cores)
+    # 设置PyTorch
+    torch.set_num_threads(desired_cores)
+
+    print(f"TianMouCV将限制单进程中opencv与pytorch默认的线程上限为CPU总核心数的1/4(<=32): {desired_cores}/{total_cores}")
+
+# 调用函数
+print('TianMouCV™ 0.3.4.4, via',__author__,' update covert tool and bandwith calculator')
+limit_threads()
