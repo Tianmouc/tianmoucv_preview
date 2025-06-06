@@ -10,6 +10,7 @@ import sys
 try:
     from tianmoucv.rdp_usb import rod_decoder_py as rdc
 except:
+    import subprocess
     print("WARNING: no decoder found, try to auto compile")
     print('If you still get this message,please try:\n 1. run it in a python script (only once) \n 2. installfrom source code (install.sh) to see what happened')
     
@@ -54,5 +55,5 @@ def limit_threads():
     print(f"TianMouCV将限制单进程中opencv与pytorch默认的线程上限为CPU总核心数的1/4(<=32): {desired_cores}/{total_cores}")
 
 # 调用函数
-print('TianMouCV™ 0.3.4.4, via',__author__,' update covert tool and bandwith calculator')
+print('TianMouCV™ 0.3.5.0, via',__author__,' fix pip install bug')
 limit_threads()
