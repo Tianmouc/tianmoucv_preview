@@ -13,6 +13,9 @@ tensorboard>=2.4.1
 pandas>=1.1.4
 seaborn>=0.11.0
 pybind11
+requests
+torch
+torchvision
 
 # Extras --------------------------------------
 ipython  # interactive notebook

@@ -13,7 +13,7 @@ except:
     print("WARNING: no decoder found, try to auto compile")
     print('If you still get this message,please try:\n 1. run it in a python script (only once) \n 2. installfrom source code (install.sh) to see what happened')
     
-    current_file_path = os.path.abspath(__file__)
+    current_file_path = os.path.dirname(os.path.abspath(__file__))
     aim_path = os.path.join(current_file_path,'rdp_usb')
     os.chdir(aim_path)
     current_path = os.getcwd()
