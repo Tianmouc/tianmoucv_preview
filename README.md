@@ -39,7 +39,7 @@ sh install.sh
 
 ## Data
 
-You can download a TianMouC data clip in [THU-sharelink](https://cloud.tsinghua.edu.cn/f/dc0d394efcb44af3b9b3/?dl=1), and refer to tianmoucv/exmaple/data/test_data_read.ipynb for a trial
+You can download a TianMouC data clip in [THU-sharelink](http://www.tianmouc.cn:38328/index.php/s/xWDkYbxgRYPX2QT/download/fishe8.7z), and refer to tianmoucv/exmaple/data/test_data_read.ipynb for a trial
 
 a standard TianMouC dataset structure:
 
