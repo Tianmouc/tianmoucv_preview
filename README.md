@@ -83,7 +83,8 @@ sh install.sh
 
 For windows, please refer to the "install.bat", with the help of winGW
 
-**If you do not need to use the SDK, just press ENTER when inputing the SDK PATH**
+You can download a TianMouC data clip in [THU-sharelink](http://www.tianmouc.cn:38328/index.php/s/HRoqBbmiSpfnY4G/download/fishe8.7z), and refer to tianmoucv/exmaple/data/test_data_read.ipynb for a trial
+
 
 (3) Only update python codes (If you have already compile the lib manually), it will be helpful if you want to save your time modifying some python codes in TianmouCV.
 
@@ -128,21 +129,12 @@ The examples are listed below
 ```
 ├── Tianmoucv example
 │   ├── introduction_to_tianmouc_data: Introduce how to read and visualize Tianmouc data.
-│   ├── >>>camera<<< connect to camera (SDK installation required).
-│   │   ├── open_camera: recieve and visualize Tianmouc data (tempate code)
-│   │   ├── qrcode_demo:  Decode QR code based on SD.
-│   │   ├── calibration_OpenCV: CameraCalib tool
-│   │   ├── deblur: (buggy) deblur rgb using tsd
-│   │   ├── realtime_inf: Realtime instance segmentation
 │   ├── >>>data<<<
 │   │   ├── covert_to_tmdat_and_calculate_bandwidth: Encode np array into the tmdat and calculate the bandwidth.
 │   │   ├── rotate_tsd: trick for rotate 2D vector filed -- SD
-│   │   ├── convert_pcie_bin_to_tmdat: tool for fpga dev version
 │   ├── >>>proc<<<
-│   │   ├── segmentation: dual pathway fusion instance segmentation
 │   │   ├── feature_tracking_gray_sd: feature tracking based only on SD
 │   │   ├── reconstructor:
-│   │   │   ├──reconstruct_fuse_net: best HDR-RGB vedio NN-based reconstructor
 │   │   │   ├──reconstruct_gray: Gray-scale image reconstruction based on SD
 │   │   │   ├──reconstruct_hdr_poisson_iter: simple HDR fusion method
 │   │   │   ├──reconstruct_original_nature_paper: RGB vedio NN-based reconstructor in original  Nature paper
@@ -152,11 +144,8 @@ The examples are listed below
 │   │   │   ├──opticalflow_HS_method: HS OF esitmator with TSD
 │   │   │   ├──opticalflow_LK_method: LK OF esitmator with TSD
 │   │   │   ├──opticalflow_spynet: NN-based OF estimator in original Nature paper
-│   │   │   ├──opticalflow_RAFT: best NN-based OF estimator
 │   │   ├── denoise:
 │   │   │   ├──denoise_tmdat_lvatf:denoise TSD using LVATF
-│   │   ├── deblur
-│   │   │   ├──deblur_stgdnet: deblur rgb using tsd
 │   ├── >>>imulator<<<
 │   │   │   ├──sim.ipynb: run simulator for rgb/td/sd sequence with vedio input
 ```
