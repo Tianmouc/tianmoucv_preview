@@ -39,7 +39,7 @@ setup(
     version='0.4.0.0',                    # 版本号
     author='Yihan Lin,Taoyi Wang',        # 作者名称
     author_email='532109881@qq.com',      # 作者邮箱
-    description='Algorithms library for Tianmouc sensor(preview version)',   # 简要描述
+    description='Algorithms library for Tianmouc sensor_preview version',   # 简要描述
     url='https://github.com/Tianmouc/tianmoucv',  # 项目主页的URL
     packages=find_packages(),   # 告诉 setuptools 自动找到要安装的包
     package_data = {'':['rdp_pcie/*',
