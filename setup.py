@@ -7,7 +7,7 @@ with open("./requirements.txt", "r", encoding="utf-8") as fh:
     install_requires = fh.read()
 
 with open("./README.md", "r", encoding="utf-8") as fh:
-    long_description = fh.read()
+    long_description = "TianmouCV is the official algorithm library of Tinamouc V1 (and soon will support Tianmouc V2..), including codec of the Tianmouc data (.tmdat files), deeplearning-friendly dataset reader, basic ISP tools, feature descriptions of TSD, classicle optical flow estimator and gray-sacle reconstructor, some basic but useful neural-network (reconstruction, opticla flow, deblur, instance segmentation and so on)."
 
 '''
 major.minor.patch.
