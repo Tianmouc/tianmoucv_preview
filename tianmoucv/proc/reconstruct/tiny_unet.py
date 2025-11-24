@@ -34,7 +34,7 @@ class TianmoucRecon_tiny(nn.Module):
                 ckpt_path = default_file_name
             print('load finished')
             
-        dict_re = torch.load(ckpt_path, map_location=torch.device('cpu'))['state_dict_ReconModel']
+        dict_re = torch.load(ckpt_path, map_location=torch.device('cpu'),weights_only=False)['state_dict_ReconModel']
         dict_reconNet = dict([])
         for key in dict_re:
             new_key_list = key.split('.')[1:]

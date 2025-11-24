@@ -4,19 +4,21 @@ matplotlib>=3.2.2
 numpy>=1.18.5
 opencv-python>=4.1.1
 scipy>=1.4.1
-tqdm>=4.64.0
+tqdm
+requests
 
 # Logging -------------------------------------
-tensorboard>=2.4.1
+tensorboard
 
 # Plotting ------------------------------------
-pandas>=1.1.4
-seaborn>=0.11.0
+pandas
+seaborn
 pybind11
 requests
-torch
+torch>=1.10,<2.7
 torchvision
 
 # Extras --------------------------------------
 ipython  # interactive notebook
-thop>=0.1.1  # FLOPs computation
+thop # FLOPs computation
+einops

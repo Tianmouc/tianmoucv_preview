@@ -44,7 +44,7 @@ class TianmoucOF_SpyNet(nn.Module):
         self.W, self.H = imgsize
         self.gridX, self.gridY = np.meshgrid(np.arange(self.W), np.arange(self.H))
         
-        dict1 = torch.load(ckpt_path, map_location=torch.device('cpu'))
+        dict1 = torch.load(ckpt_path, map_location=torch.device('cpu'),weights_only=False)
         dict1 = dict1['state_dict_OF']
         dict_flowComp = dict([])
         for key in dict1:

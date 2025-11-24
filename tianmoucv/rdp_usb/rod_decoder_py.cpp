@@ -1166,7 +1166,7 @@ std::vector<uint64_t> usbfmt_contruct_frm_list(const std::string &fpath, py::lis
     uint64_t frame_size = 0;
     int frm_num = 0;
     int *pval_head = (int*) malloc(16 * sizeof(int));
-    printf("Construct begin %s, file size %ld\n", fpath.c_str(), file_size);
+    //printf("Construct begin %s, file size %ld\n", fpath.c_str(), file_size);
     int fnum = 0;
     while(readstart_ptr < file_size){
         //printf("readstart_ptr %d\n", readstart_ptr);
@@ -1200,45 +1200,6 @@ std::vector<uint64_t> usbfmt_contruct_frm_list(const std::string &fpath, py::lis
     free(pval_head);
     return frm_start_Ptrlist;
 }
-
-// py::generator usbfmt_get_multiple_rod(const std::string &fpath, int frm_start_pos, int read_num, int width, int height){
-//     std::ifstream fin(fpath, std::ios::in | std::ios::binary);
-//     if(!fin){
-//         printf("Can not open file %s\n", fpath.c_str());
-//         return -1;
-//     }
-//     int file_size = getFileSize(fpath.c_str());//Byte109110
-//     int frame_size = 0;
-//     int reader_frm_start_pos = frm_start_pos;
-//     for(auto i = 0; i < read_num; i++){
-//         if(reader_frm_start_pos >= file_size){
-//             break;
-//         }
-//         fin.seekg(reader_frm_start_pos + 6 * 4);
-//         fin.read((char *) &frame_size, 4);
-//         fin.seekg(reader_frm_start_pos);
-//         int *pvalue = (int *)calloc(frame_size , sizeof(int));
-//         fin.read((char *) pvalue, frame_size * sizeof(int));
-//         //py::array_t<char> array({static_cast<py::ssize_t>(bytesRead)}, {1}, buffer.data());
-//         reader_frm_start_pos = frame_size * 4 + reader_frm_start_pos;
-//         std::array<int8_t, width * height> temp_diff;
-//         temp_diff.fill(0);
-//         std::array<int8_t, width * height> spat_diff_left;
-//         spat_diff_left.fill(0);
-//         std::array<int8_t, width * height> spat_diff_right;
-//         spat_diff_right.fill(0);
-//         int td_size_val, sd_size_val;
-//         uint64_t rtimestamp;
-//         int radc_prec, rfcnt;
-//         // decoder
-//         int ret = rod_decoder_tdsd_size(pvalue, temp_diff.data(), spat_diff_left.data(), spat_diff_right.data(), &td_size_val, &sd_size_val, height, width, &rtimestamp, &rfcnt, &radc_prec);
-//         std::array td_sd_comp = temp_diff; 
-//         td_sd_comp.insert(td_sd_comp.end(), spat_diff_left.begin(), spat_diff_left.end()); 
-//         td_sd_comp.insert(td_sd_comp.end(), spat_diff_right.begin(), spat_diff_right.end());
-//         free(pvalue);
-//     }
-//     fin.close();
-// }
 
 
 int usbfmt_get_one_rod_fullinfo(const std::string &fpath, uint64_t frm_start_pos,
@@ -1283,8 +1244,8 @@ int usbfmt_get_one_rod_fullinfo(const std::string &fpath, uint64_t frm_start_pos
     int8_t* sd_l_ptr = (int8_t*) sd_l_buf.ptr;
     int8_t* sd_r_ptr = (int8_t*) sd_r_buf.ptr;
     int* ds_ptr = (int*) ds_buf.ptr;
-     int* tds_ptr = (int*) tds_buf.ptr;
-     int* sds_ptr = (int*) sds_buf.ptr;
+    int* tds_ptr = (int*) tds_buf.ptr;
+    int* sds_ptr = (int*) sds_buf.ptr;
 
     int td_size_val, sd_size_val;
     int radc_prec, rfcnt;
@@ -1301,6 +1262,102 @@ int usbfmt_get_one_rod_fullinfo(const std::string &fpath, uint64_t frm_start_pos
 
     free(pvalue);
     return 0;
+}
+
+
+int usbfmt_get_continous_rods_fullinfo(const std::string &fpath, uint64_t frm_start_pos, 
+                        py::array_t<int8_t>& temp_diff_np, py::array_t<int8_t>& spat_diff_left_np, py::array_t<int8_t>& spat_diff_right_np, 
+                        py::array_t<int>& diff_size, py::array_t<int>& td_size, py::array_t<int>& sd_size,
+                        py::array_t<uint64_t>& timestamp, py::array_t<int>& fcnt, py::array_t<int>& adc_bit_prec,
+                        int height, int width, int max_frames) {
+
+    std::ifstream fin(fpath, std::ios::in | std::ios::binary);
+    if (!fin) {
+        printf("Can not open file %s\n", fpath.c_str());
+        return -1;
+    }
+
+    uint64_t file_size = std::filesystem::file_size(fpath);
+    uint64_t current_pos = frm_start_pos;
+    int frame_counter = 0;
+
+    // 获取指针到输出数组
+    py::buffer_info td_buf = temp_diff_np.request();
+    py::buffer_info sd_l_buf = spat_diff_left_np.request();
+    py::buffer_info sd_r_buf = spat_diff_right_np.request();
+    py::buffer_info ds_buf = diff_size.request();
+    py::buffer_info tds_buf = td_size.request();
+    py::buffer_info sds_buf = sd_size.request();
+    py::buffer_info timestamp_buf = timestamp.request();
+    py::buffer_info fcount_buf = fcnt.request();
+    py::buffer_info adc_bit_prec_buf = adc_bit_prec.request();
+
+    uint64_t* timestamp_ptr = (uint64_t*)timestamp_buf.ptr;
+    int* fcnt_ptr = (int*)fcount_buf.ptr;
+    int* adcprec_ptr = (int*)adc_bit_prec_buf.ptr;
+    int* ds_ptr = (int*)ds_buf.ptr;
+    int* tds_ptr = (int*)tds_buf.ptr;
+    int* sds_ptr = (int*)sds_buf.ptr;
+
+    const int frame_data_size = height * width;  // 单帧数据量
+    int8_t* td_ptr = (int8_t*)td_buf.ptr;
+    int8_t* sd_l_ptr = (int8_t*)sd_l_buf.ptr;
+    int8_t* sd_r_ptr = (int8_t*)sd_r_buf.ptr;
+
+    while (frame_counter < max_frames && current_pos < file_size) {
+        // 读取帧长度
+        fin.seekg(current_pos + 24);  // 6 * 4 bytes offset
+        int frame_size_bytes = 0;
+        if (!fin.read(reinterpret_cast<char*>(&frame_size_bytes), 4)) {
+            break;  // 读失败则终止
+        }
+
+        frame_size_bytes = frame_size_bytes & 0xffffff;  // 取24位长度
+        if (frame_size_bytes <= 0 || current_pos + frame_size_bytes * 4 > file_size) {
+            break;  // 长度无效或超出文件范围
+        }
+
+        // 读取帧数据
+        fin.seekg(current_pos);
+        int* frame_data = (int*)malloc(frame_size_bytes * sizeof(int));
+        if (!frame_data) {
+            break;  // 内存分配失败
+        }
+
+        fin.read(reinterpret_cast<char*>(frame_data), frame_size_bytes * sizeof(int));
+        if (fin.gcount() != static_cast<int>(frame_size_bytes * sizeof(int))) {
+            free(frame_data);
+            break;  // 读取不完整
+        }
+
+        // 计算当前帧的输出位置
+        int8_t* cur_td_ptr = td_ptr + frame_counter * frame_data_size;
+        int8_t* cur_sd_l_ptr = sd_l_ptr + frame_counter * frame_data_size;
+        int8_t* cur_sd_r_ptr = sd_r_ptr + frame_counter * frame_data_size;
+
+        // 解码当前帧
+        int td_val, sd_val;
+        int adc_prec_val, fcnt_val;
+        uint64_t ts_val;
+        int ret = rod_decoder_tdsd_size(frame_data, cur_td_ptr, cur_sd_l_ptr, cur_sd_r_ptr,
+                                       &td_val, &sd_val, height, width,
+                                       &ts_val, &fcnt_val, &adc_prec_val);
+
+        // 保存单值结果
+        timestamp_ptr[frame_counter] = ts_val;
+        fcnt_ptr[frame_counter] = fcnt_val;
+        adcprec_ptr[frame_counter] = adc_prec_val;
+        ds_ptr[frame_counter] = ret;
+        tds_ptr[frame_counter] = td_val;
+        sds_ptr[frame_counter] = sd_val;
+
+        free(frame_data);
+        current_pos += frame_size_bytes * sizeof(int);  // 移动到下一帧
+        frame_counter++;
+    }
+
+    fin.close();
+    return frame_counter;  // 返回成功读取的帧数
 }
 
 
@@ -1844,76 +1901,6 @@ void cone_compact_pcie2usb(const std::string &dataset_top, int effect_size, cons
 	return;
 }
 
-
-// int usbfmt_get_multi_rod_fullinfo(const std::string &fpath, int frm_start_pos, int read_num, 
-//                         py::array_t<int8_t>& temp_diff_np, py::array_t<int8_t>& spat_diff_left_np, py::array_t<int8_t>& spat_diff_right_np, 
-//                         py::array_t<int>& diff_size, py::array_t<int>& td_size, py::array_t<int>& sd_size,
-//                         py::array_t<uint64_t>& timestamp, py::array_t<int>& fcnt, py::array_t<int>& adc_bit_prec,
-//                         int height, int width){
-
-
-    
-//     std::ifstream fin(fpath, std::ios::in | std::ios::binary);
-//     if(!fin){
-//         printf("Can not open file %s\n", fpath.c_str());
-//         return -1;
-//     }
-//     //int file_size = getFileSize(fpath.c_str());
-//     int fileSize = static_cast<int>file.tellg();
-//     int max_size = 40448;
-//     int *pvalue = (int *)calloc(max_size , sizeof(int));
-//     fin.read((char *) pvalue, frame_size * sizeof(int));
-//     py::buffer_info td_buf = temp_diff_np.request();
-//     py::buffer_info sd_l_buf = spat_diff_left_np.request();
-//     py::buffer_info sd_r_buf = spat_diff_right_np.request();
-//     py::buffer_info ds_buf = diff_size.request();
-//     py::buffer_info tds_buf = td_size.request();
-//     py::buffer_info sds_buf = sd_size.request();
-//     py::buffer_info timestamp_buf = timestamp.request();
-//     py::buffer_info fcount_buf = fcnt.request();
-//     py::buffer_info adc_bit_prec_buf = adc_bit_prec.request();
-
-//   uint64_t* timestamp_ptr = (uint64_t*) timestamp_buf.ptr;
-//     int* fcnt_ptr = (int*) fcount_buf.ptr;
-//     int* adcprec_ptr = (int*) adc_bit_prec_buf.ptr;
-//     //int* pvalue = (int*) malloc(pvalue_np.size());
-//     //Py_ssize_t size = PyBytes_GET_SIZE(pvalue.ptr());
-//     //int* pval_ptr = (int*) pvalue.ptr();
-//    // int* pval_ptr = (int *) pvalue;
-//     int diffoffset = width * height;
-    
-//     int8_t* td_ptr = (int8_t*) td_buf.ptr;
-//     int8_t* sd_l_ptr = (int8_t*) sd_l_buf.ptr;
-//     int8_t* sd_r_ptr = (int8_t*) sd_r_buf.ptr;
-//     int* ds_ptr = (int*) ds_buf.ptr;
-//      int* tds_ptr = (int*) tds_buf.ptr;
-//      int* sds_ptr = (int*) sds_buf.ptr;
-//     int reader_frm_start_pos = frm_start_pos;
-//     for (int i = 0; i < read_num; i++){
-//         if(reader_frm_start_pos >= file_size){
-//             break;
-//         }
-//         fin.seekg(reader_frm_start_pos + 6 * 4);
-//         fin.read((char *) &frame_size, 4);
-//         fin.seekg(reader_frm_start_pos);
-//         int *pvalue = (int *)calloc(frame_size , sizeof(int));
-//         fin.read((char *) pvalue, frame_size * sizeof(int));
-//         reader_frm_start_pos = frame_size * 4 + reader_frm_start_pos;
-
-    
-//         int td_size_val, sd_size_val;
-//         int radc_prec, rfcnt;
-//         uint64_t rtimestamp;
-//         //int* pval_ptr = pvalue;
-//         int ret = rod_decoder_tdsd_size(pvalue, td_ptr, sd_l_ptr, sd_r_ptr, &td_size_val, &sd_size_val, height, width, &rtimestamp, &rfcnt, &radc_prec);
-//      }
-//     fin.close();
-//     free(pvalue);
-        
-
-//     return 0;
-// }
-
 PYBIND11_MODULE(rod_decoder_py, m){
     m.doc() = "pybind11 rod decoder";
     m.def("rod_decoder_py", &rod_decoder_py, "rod_decoder_py" );
@@ -1928,7 +1915,8 @@ PYBIND11_MODULE(rod_decoder_py, m){
     m.def("rod_decoder_py_onlyinfo", &rod_decoder_py_onlyinfo, "rod_decoder_py_onlyinfo");
     m.def("construct_frm_list", &usbfmt_contruct_frm_list, "usbfmt_contruct_frm_list");
     m.def("get_one_rod_fullinfo", &usbfmt_get_one_rod_fullinfo, "usbfmt_get_one_rod_fullinfo");
-     m.def("get_one_cone_fullinfo", &usbfmt_get_one_cone_fullinfo, "USB format get one cone frame with full info");
+    m.def("get_multiple_rods_fullinfo", &usbfmt_get_continous_rods_fullinfo, "usbfmt_get_continous_rods_fullinfo");
+    m.def("get_one_cone_fullinfo", &usbfmt_get_one_cone_fullinfo, "USB format get one cone frame with full info");
     m.def("rod_pcie2usb_conv", &rod_compact_pcie2usb, "Convert Rod PCIE data to USB data format");
     m.def("cone_pcie2usb_conv", &cone_compact_pcie2usb, "Convert Cone PCIE data to USB data format");
     m.def("rod_encoder_np", &rod_encoder_from_np, "rod_encoder_from_np");

@@ -24,11 +24,12 @@ except:
   
     
 #用于重建
-from tianmoucv.proc.denoise import custom_round,conv_and_threshold,conv_and_threshold_1,denoise_defualt_args
 from tianmoucv.proc.reconstruct import poisson_blending
-from tianmoucv.isp import default_rgb_isp
+from tianmoucv.proc.denoise import custom_round,conv_and_threshold,conv_and_threshold_1,denoise_defualt_args
+from tianmoucv.isp import default_rgb_isp,upsample_cross_conv,SD2XY
 from .tianmoucData_basic import TianmoucDataReader_basic
 from .tianmoucDataSampleParser import TianmoucDataSampleParser
+from .singlePathwayDecoder import multiple_rods_tmdat_to_npy_from_addr
 
 class TianmoucDataReader(TianmoucDataReader_basic):
     '''
@@ -81,8 +82,9 @@ class TianmoucDataReader(TianmoucDataReader_basic):
                  ifcache = False, 
                  print_info=True,
                  training=True,
-                 strict = True,
+                 strict=False,
                  use_data_parser = False,
+                 _correct_sd_upsampler = False,
                  dark_level = 0):
         
         self.N = N
@@ -103,6 +105,7 @@ class TianmoucDataReader(TianmoucDataReader_basic):
 
         self.aop_denoise = aop_denoise
         self.aop_denoise_args = aop_denoise_args
+        self._correct_sd_upsampler = _correct_sd_upsampler
         if self.aop_denoise:
             print('[tianmoucv Datareader]Customising your aop_denoise_args using tianmoucv.data.denoise_utils.denoise_defualt_args()')
             print('[tianmoucv Datareader]Better to provide:{\'TD\':[np.array]*2,\'SDL\':[np.array]*2*aop_cop_rate,\'SDR\':[np.array]*2*aop_cop_rate}')
@@ -238,7 +241,6 @@ class TianmoucDataReader(TianmoucDataReader_basic):
         metaInfo['C_timestamp'] = coneTimeStamp_list
         metaInfo['C_idx'] = cone_id
         metaInfo['R_name'] = rodfilename
-        metaInfo['R_timestamp'] = []
         metaInfo['R_idx'] = rod_id
         metaInfo['key'] = key
         metaInfo['sample_length'] = len(self.fileDict[key]['legalData'])
@@ -246,13 +248,19 @@ class TianmoucDataReader(TianmoucDataReader_basic):
 
         #read all aop frames
         tsd = torch.zeros([3,itter,self.rod_height,self.rod_width])
-        for i in range(itter):
-            startAddr = rodAddrs[i]
-            sdl,sdr,td,rodTimeStamp = self.readRodFast(rodfilename,startAddr)
-            tsd[0,i,:,:] = torch.Tensor(td.astype(np.float32)).view(self.rod_height,self.rod_width)
-            tsd[1,i,:,:] = torch.Tensor(sdl.astype(np.float32)).view(self.rod_height,self.rod_width)
-            tsd[2,i,:,:] = torch.Tensor(sdr.astype(np.float32)).view(self.rod_height,self.rod_width)
-            metaInfo['R_timestamp'].append(rodTimeStamp.astype(np.int64))
+
+        tsd, rodTimeStamp = multiple_rods_tmdat_to_npy_from_addr(rodfilename, addr = rodAddrs[0] ,length=itter,print_info=False)
+        tsd = torch.FloatTensor(tsd)
+        metaInfo['R_timestamp'] = rodTimeStamp
+
+        #metaInfo['R_timestamp'] = []
+        #for i in range(itter):
+        #    startAddr = rodAddrs[i]
+        #    sdl,sdr,td,rodTimeStamp = self.readRodFast(rodfilename,startAddr)
+        #    tsd[0,i,:,:] = torch.Tensor(td.astype(np.float32)).view(self.rod_height,self.rod_width)
+        #    tsd[1,i,:,:] = torch.Tensor(sdl.astype(np.float32)).view(self.rod_height,self.rod_width)
+        #    tsd[2,i,:,:] = torch.Tensor(sdr.astype(np.float32)).view(self.rod_height,self.rod_width)
+        #    metaInfo['R_timestamp'].append(rodTimeStamp.astype(np.int64))
 
         #denoising
         if self.aop_denoise:
@@ -266,9 +274,14 @@ class TianmoucDataReader(TianmoucDataReader_basic):
         sample['rawDiff'] = tsd
         mingap = (itter-1)//self.N
         if needPreProcess:
-            tsdiff_inter  = self.tsd_preprocess(tsd)
-            tsdiff_resized = F.interpolate(tsdiff_inter,(320,640),mode='bilinear')
-            sample['tsdiff'] = tsdiff_resized
+            tsd_expand_original,txydiff_expand  = self.tsd_preprocess(tsd)
+            
+            if self._correct_sd_upsampler:
+                txydiff_resized = F.interpolate(txydiff_expand,(320,640),mode='bilinear')
+                sample['txydiff'] = txydiff_resized
+            else:
+                tsdiff_resized = F.interpolate(tsd_expand_original,(320,640),mode='bilinear')
+                sample['tsdiff'] = tsdiff_resized
             for i in range(self.N+1): 
                 frame,frame_without_isp = self.rgb_preprocess(rgb_list[i])
                 frame_raw = raw_list[i]
@@ -291,7 +304,12 @@ class TianmoucDataReader(TianmoucDataReader_basic):
         return sample
     
     def tsd_preprocess(self,tsdiff):
-        return self.upsampleTSD_conv(tsdiff)/128.0   
+        #upsample_cross_conv: 老算法
+        tsd_expand_original = upsample_cross_conv(tsdiff)/128.0   
+        
+        Ix,Iy= (e/128.0 for e in SD2XY(tsdiff[1:,...].permute(1,0,2,3)))
+        TXYD = torch.stack([tsd_expand_original[0,...],Ix,Iy],dim=0)
+        return tsd_expand_original,TXYD
 
     def rgb_preprocess(self,F_raw):
         F,F_without_isp = default_rgb_isp(F_raw,blc=self.blc)
@@ -544,7 +562,11 @@ class TianmoucDataReader(TianmoucDataReader_basic):
             denoise_raw_tsd[:, j, ...]=raw_tsd[:,j,...]
 
         #optional
-        return denoise_raw_tsd
+        if denoise_function is None:
+            return denoise_raw_tsd
+        else:
+            return denoise_function(raw_tsd,denoise_function_args)
+
 
     ##################################################################################################################################
     #>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>[暗噪声标定]<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<

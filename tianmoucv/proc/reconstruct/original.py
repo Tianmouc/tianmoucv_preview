@@ -19,8 +19,8 @@ class TianmoucRecon_Original(nn.Module):
         super(TianmoucRecon_Original, self).__init__()
         current_dir=os.path.dirname(__file__)
         if ckpt_path is None:
-            ckpt_path = 'http://www.tianmouc.cn:38328/index.php/s/YELLKofnnmNHwks/download/unet_nature_reconstruction.ckpt'
-        
+            ckpt_path = 'http://www.tianmouc.cn:38328/index.php/s/cNcGncJ4rm7ZTFi/download/unet_nature_reconstruction.ckpt'
+
         self.flowComp = SpyNet(dim=1+2+2)
         self.syncComp = UNet_Original(8, 3)
         self.reconNet =  UNetRecon_Original(4,3)
@@ -53,7 +53,7 @@ class TianmoucRecon_Original(nn.Module):
             you can just load some of the model for pretraining
                 parameter should be stored in 'state_dict_ReconModel'->module dict
         '''
-        dict1 = torch.load(ckpt, map_location=torch.device('cpu'))
+        dict1 = torch.load(ckpt, map_location=torch.device('cpu'),weights_only=False)
         dict1 = dict1['state_dict_ReconModel']
 
         dict_reconNet = dict([])

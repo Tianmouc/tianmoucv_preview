@@ -1,0 +1,20 @@
+
+{
+  "dark_fpn_stat" : {
+    "td_odd_mean": 0.12,
+    "td_odd_std": 0.75,
+    "sdl_odd_mean": 0.002,
+    "sdl_odd_std" :0.897,
+    "sdr_odd_mean": 0.014,
+    "sdr_odd_std": 1.01,
+    "td_even_mean": 0.32,
+    "td_even_std": 0.64,
+    "sdl_even_mean": -0.014,
+    "sdl_even_std" :0.9,
+    "sdr_even_mean": -0.002,
+    "sdr_even_std": 1.02
+  },
+  "adc_bit_prec" : 8
+
+
+}

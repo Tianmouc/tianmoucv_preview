@@ -333,7 +333,7 @@ def draw_result(pred,imshow,masks,text=''):
         conf = one_pred[4]
         classid = int(one_pred[5])
         
-        text_img = coco_segmentation_classes_80[classid+1]
+        text_img = coco_segmentation_classes_80[classid+1] + ':' + format(conf, '.2f')
         
         bbox = bbox.int().numpy()
         pt1 = bbox[:2]
@@ -341,7 +341,7 @@ def draw_result(pred,imshow,masks,text=''):
         color = [int(c*255) for c in _COLORS[classid,:]]
         cv2.rectangle(imshow, pt1, pt2, color, 2)
         
-        cv2.putText(imshow, text_img, pt1, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+        cv2.putText(imshow, text_img, pt1, cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 1)
         
         for c in range(3):
             imshow[...,c][mask>0] = (imshow[...,c]*0.5+color[c]*0.5)[mask>0]

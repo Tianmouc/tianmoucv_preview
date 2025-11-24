@@ -8,4 +8,6 @@ from .integration import TD_integration,SD_integration
 
 from .tiny_unet import TianmoucRecon_tiny
 
+from .recurrent import TianmoucRecon_recurrent
+
 from .original import TianmoucRecon_Original

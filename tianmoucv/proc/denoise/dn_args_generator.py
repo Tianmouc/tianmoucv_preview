@@ -5,6 +5,8 @@ import torch
 import torch.nn.functional as F
 import torch.nn as nn
 
+from tianmoucv.proc.denoise import LVAFT,LVFT
+
 class denoise_defualt_args:
 
     def __init__(self,
@@ -21,9 +23,16 @@ class denoise_defualt_args:
         
         self.thr_fpn = gain
         self.self_calibration = self_calibration
-        self.denoise_function = None
-        self.denoise_function_args = None
-        
+        self.denoise_function = LVAFT
+        self.denoise_function_args = dict()
+        self.denoise_function_args['sd_params'] = {"var_fil_ksize":var_fil_ksize,
+                                         "var_th":var_th * gain,
+                                         "adapt_th_min":adapt_th_min * gain,
+                                         "adapt_th_max":adapt_th_max * gain}
+        self.denoise_function_args['td_params'] = {"var_fil_ksize":var_fil_ksize,
+                                         "var_th":var_th * gain,
+                                         "adapt_th_min":adapt_th_min * gain,
+                                         "adapt_th_max":adapt_th_max * gain}
         if self_calibration:
             print('[denoise_defualt_args]data reader will try to calibrate fpn using its own aop data, set to [True] for dark noise data')
         
@@ -33,6 +42,9 @@ class denoise_defualt_args:
             print('aop_dark_dict,dict,dark noise for td,sdl,sdr (key,length,shape):',[(key,len(self.aop_dark_dict[key]),self.aop_dark_dict[key][0].shape) for key in self.aop_dark_dict] )
         else:
             print('denoise_args didnot provide dark noise, data reader will try to calibrate fpn using bright aop data(self_calibration=True), or use ZEROS(self_calibration=False)')
+        print('self.denoise_function:',self.denoise_function)     
+        print('self.denoise_function_args[sd_params] * gain:',self.denoise_function_args['sd_params'])
+        print('self.denoise_function_args[td_params] * gain:',self.denoise_function_args['td_params'])
         print('self.thr_fpn (== gain)',self.thr_fpn)
         print('------denoise_defualt_args----')
 

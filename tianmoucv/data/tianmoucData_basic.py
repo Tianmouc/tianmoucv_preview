@@ -13,10 +13,8 @@ except:
 #用于重建
 #用于rgb的ISP
 from tianmoucv.proc.reconstruct import poisson_blending
-from tianmoucv.isp import default_rgb_isp,SD2XY,ACESToneMapping
-
+from tianmoucv.isp import default_rgb_isp,SD2XY,upsampleTSD_conv,ACESToneMapping,upsample_cross_conv
 from ctypes import *
-
 flag = True
 
 class TianmoucDataReader_basic():
@@ -115,7 +113,9 @@ class TianmoucDataReader_basic():
                 np.save(cachePath, self.fileDict)
         
         #Scan all samples to generate a file list, use to control the sparsity
+        # print('[tianmoucv Datareader debug] before extraction',self.fileDict)
         self.extraction(MAXLEN,uniformSampler)
+        # print('[tianmoucv Datareader debug] after extraction',self.fileDict)
             
         # print the dataset information
         for key in self.fileDict:
@@ -486,9 +486,9 @@ class TianmoucDataReader_basic():
         SD_1 = tsd[1:,itter - 1,...]
             
         if needPreProcess:
-            start_frame,end_frame,tsdiff_inter,F0_without_isp,F1_without_isp  = self.preprocess(start_frame_raw,end_frame_raw,tsd)
+            start_frame,end_frame,tsdiff_inter_original,F0_without_isp,F1_without_isp  = self.preprocess(start_frame_raw,end_frame_raw,tsd)
             #sample['tsdiff_160x320'] = tsdiff_inter
-            tsdiff_resized = F.interpolate(tsdiff_inter,(320,640),mode='bilinear')
+            tsdiff_resized = F.interpolate(tsdiff_inter_original,(320,640),mode='bilinear')
             sample['tsdiff'] = tsdiff_resized
             sample['F0_without_isp'] = F0_without_isp
             sample['F1_without_isp'] = F1_without_isp
@@ -526,47 +526,12 @@ class TianmoucDataReader_basic():
         '''
         use isp in TIANMOUCV
         '''
-        ts = time.time()
         F0,F0_without_isp = default_rgb_isp(F0_raw,blc=self.blc)
         F1,F1_without_isp = default_rgb_isp(F1_raw,blc=self.blc)
-        te1 = time.time()
-        tsdiff_inter = self.upsampleTSD_conv(tsdiff)/128.0
-        te2 = time.time()
-        return F0,F1,tsdiff_inter,F0_without_isp,F1_without_isp
-
-    def upsampleTSD_conv(self,tsdiff):
-        '''
-        adjust the data space and upsampling, please refer to tianmoucv doc for detail
-        '''
-        # 获取输入Tensor的维度信息
-        h,w = tsdiff.shape[-2:]
-        w *= 2
-        tsdiff_expand = torch.zeros([*tsdiff.shape[:-2],h,w])
-        tsdiff_expand[...,::2,::2] = tsdiff[...,::2,:]
-        tsdiff_expand[...,1::2,1::2] = tsdiff[...,1::2,:]
-        channels, T, height, width = tsdiff_expand.size()
-        input_tensor = tsdiff_expand.view(channels*T, height, width).unsqueeze(1)
-        # 定义卷积核
-        kernel = torch.zeros(1, 1, 3, 3)
-        kernel[:, :, 1, 0] = 1/4
-        kernel[:, :, 1, 2] = 1/4
-        kernel[:, :, 0, 1] = 1/4
-        kernel[:, :, 2, 1] = 1/4
-        # 对输入Tensor进行反射padding
-        padded_tensor = F.pad(input_tensor, (1, 1, 1, 1), mode='reflect')
-        # 将原tensor复制一份用于填充结果
-        output_tensor = input_tensor.clone()
-
-        # 将卷积结果填充回原tensor
-        for c in range(channels*T):
-            #print(padded_tensor[0,:8,:8])
-            output = F.conv2d(padded_tensor[c:c+1,:,...], kernel, padding=0)
-            #print(output[0,:8,:8])
-            output_tensor[c:c+1,: , 0:-1:2, 1:-1:2] = output[:, :, 0:-1:2, 1:-1:2]
-            output_tensor[c:c+1,: , 1:-1:2, 0:-1:2] = output[:, :, 1:-1:2, 0:-1:2]
-            #print(output_tensor[0,:8,:8])
-        return output_tensor[:,0,...].view(channels, T, height, width)
-
+        #upsample_cross_conv: 老算法
+        tsdiff_inter_original = upsample_cross_conv(tsdiff)/128.0
+        
+        return F0,F1,tsdiff_inter_original,F0_without_isp,F1_without_isp
     
     def dataNum(self,key):
         return len(self.fileDict[key]['legalData'])
