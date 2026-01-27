@@ -8,3 +8,7 @@
 - 更新对齐到tianmoucv dev版本的0.4.1.2
 - 更新readme
 - data introduction修改
+
+##  0.4.0.1 log @ 20260127
+
+- 修改一个OF的import的bug
