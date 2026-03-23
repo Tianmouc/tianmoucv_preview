@@ -151,18 +151,62 @@ def diff_response(pix_v_out, fpn, threshold, sim_cnt, device):
     return td_quantized, sdl_quant, sdr_quant
 
 def run_sim(datapath,sensor_width, sensor_height,  device, display = False, save = False, 
-            save_path = os.path.join(os.environ.get('HOME'), "temp")):
+            save_path = os.path.join(os.environ.get('HOME'), "temp"),
+            # 传感器噪声参数用于噪声增强
+            sensor_fixed_noise_prob=sim_parama.get('sensor_fixed_noise_prob', 0.0),
+            sensor_random_noise_prob=sim_parama.get('sensor_random_noise_prob', 0.0),
+            sensor_fixed_noise_mean_ch0=sim_parama.get('sensor_fixed_noise_mean_ch0', 0.2),
+            sensor_fixed_noise_std_ch0=sim_parama.get('sensor_fixed_noise_std_ch0', 0.5 / 128.0),
+            sensor_fixed_noise_mean_ch12=sim_parama.get('sensor_fixed_noise_mean_ch12', 0.0),
+            sensor_fixed_noise_std_ch12=sim_parama.get('sensor_fixed_noise_std_ch12', 0.4 / 128.0),
+            sensor_random_noise_std=sim_parama.get('sensor_random_noise_std', 1.0 / 128.0),
+            sensor_poisson_lambda=sim_parama.get('sensor_poisson_lambda', 4),
+            # 灰度输入扰动参数
+            gray_weight_jitter=sim_parama.get('gray_weight_jitter', 0.0),
+            gray_gain_min=sim_parama.get('gray_gain_min', 0.78),
+            gray_gain_max=sim_parama.get('gray_gain_max', 0.88),
+            # 仿真参数
+            sim_threshold_range=tuple(sim_parama.get('sim_threshold_range', [0.005, 0.02]))
+            ):
 
     print('读取:',datapath,'下的所有图像数据，按图像名称排序')
     print('存储到:',save_path,'')
+
+    # 1. 采样仿真阈值
+    sim_th = random.uniform(sim_threshold_range[0], sim_threshold_range[1])
     
+    # 2. 采样灰度输入扰动参数
+    gray_weights = np.array([0.299, 0.587, 0.114], dtype=np.float32)
+    gray_gain = 1.0
+    if gray_weight_jitter > 0:
+        delta = np.random.uniform(-gray_weight_jitter, gray_weight_jitter, size=3).astype(np.float32)
+        gray_weights = np.clip(gray_weights + delta, 1e-6, None)
+        gray_weights = gray_weights / np.sum(gray_weights)
+        gray_gain = float(np.random.uniform(gray_gain_min, gray_gain_max))
+
+    # 3. 采样传感器固定噪声图
+    rod_height = sensor_height // 2
+    rod_width = sensor_width // 4
+    fixed_noise_map = None
+    if sensor_fixed_noise_prob > 0 and random.random() < sensor_fixed_noise_prob:
+        fixed_noise_map = np.zeros((3, rod_height, rod_width), dtype=np.float32)
+        if sensor_fixed_noise_std_ch0 > 0:
+            fixed_noise_map[0] = np.random.normal(loc=sensor_fixed_noise_mean_ch0, 
+                                                scale=sensor_fixed_noise_std_ch0, 
+                                                size=(rod_height, rod_width)).astype(np.float32)
+        if sensor_fixed_noise_std_ch12 > 0:
+            shared_map = np.random.normal(loc=sensor_fixed_noise_mean_ch12, 
+                                        scale=sensor_fixed_noise_std_ch12, 
+                                        size=(rod_height, rod_width)).astype(np.float32)
+            fixed_noise_map[1] = shared_map
+            fixed_noise_map[2] = shared_map
+        fixed_noise_map = torch.from_numpy(fixed_noise_map).to(device)
+
     # assum you have a png, 8bit rgb dataset
     # if use some other dataset, please write your own code
     flist = sorted(os.listdir(datapath), key=sort_filenames)
     cop_cone_skip = 10 # the interval of RGB generation 
     sim_cnt = 0
-    rod_height = sensor_height // 2
-    rod_width = sensor_width // 4
     rod_v_buf = torch.zeros(size=(2, rod_height, rod_width), dtype=torch.float32, device=device)
     ### ADVANCED NOISE SIM, Fixed pattern noise odd and ven
     fixed_td_noise_odd = torch.normal(mean=dark_fpn_stat['td_odd_mean'], 
@@ -220,7 +264,13 @@ def run_sim(datapath,sensor_width, sensor_height,  device, display = False, save
             
             img = cv2.imread(os.path.join(datapath, img_file))
             img = cv2.resize(img, (sensor_width ,sensor_height))
-            img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            # 灰度扰动
+            if gray_weight_jitter > 0:
+                img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
+                img_gray = np.tensordot(img_rgb, gray_weights, axes=([-1], [0]))
+                img_gray = (img_gray * gray_gain * 255.0).clip(0, 255).astype(np.uint8)
+            else:
+                img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
             img_gray_tensor = torch.FloatTensor(img_gray).to(device)
             if sim_cnt % cop_cone_skip == 0:
                 rgb = torch.ShortTensor(img).to(device)
@@ -246,7 +296,26 @@ def run_sim(datapath,sensor_width, sensor_height,  device, display = False, save
             
             img_diff_sim = etron_img_rod.unsqueeze(0)
             rod_v_buf = push_to_fifo(rod_v_buf, img_diff_sim)
-            td, sdl, sdr = diff_response(rod_v_buf, fpn,{'td': 0.01, 'sd': 0.01}, sim_cnt, device)
+            td, sdl, sdr = diff_response(rod_v_buf, fpn, {'td': sim_th, 'sd': sim_th}, sim_cnt, device)
+
+            # 传感器噪声增强 (固定噪声 + 随机噪声)
+            td, sdl, sdr = td.float(), sdl.float(), sdr.float()
+            if fixed_noise_map is not None:
+                td = td + (fixed_noise_map[0] * 128.0)
+                sdl = sdl + (fixed_noise_map[1] * 128.0)
+                sdr = sdr + (fixed_noise_map[2] * 128.0)
+            
+            if sensor_random_noise_prob > 0 and random.random() < sensor_random_noise_prob:
+                mu = max(float(sensor_poisson_lambda), 1e-6)
+                std_target = max(float(sensor_random_noise_std), 0.0)
+                if std_target > 0:
+                    scale = (std_target / np.sqrt(2.0 * mu)) * 128.0
+                    p1 = torch.poisson(torch.full((3, rod_height, rod_width), mu, device=device))
+                    p2 = torch.poisson(torch.full((3, rod_height, rod_width), mu, device=device))
+                    skellam_noise = (p1 - p2) * scale
+                    td = td + skellam_noise[0]
+                    sdl = sdl + skellam_noise[1]
+                    sdr = sdr + skellam_noise[2]
 
             if display or save:
                 rgb_np = rgb.cpu().numpy().astype(np.uint8)
