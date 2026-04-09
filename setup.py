@@ -50,8 +50,8 @@ setup(
                         'camera/lib/*']},
     include_package_data=True,
     install_requires=install_requires,
-    long_description=long_description,
-    long_description_content_type = "text/markdown",
+    long_description="https://github.com/Tianmouc/tianmoucv/blob/main/README.md",
+    long_description_content_type="text/plain",
     # 可选的内容
     keywords='tianmoucv',           # 关键词
     classifiers=[
