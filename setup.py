@@ -6,8 +6,9 @@ from setuptools.command.install import install
 with open("./requirements.txt", "r", encoding="utf-8") as fh:
     install_requires = fh.read()
 
-with open("./README.md", "r", encoding="utf-8") as fh:
-    long_description = fh.read()
+
+long_description = "See README: https://github.com/Tianmouc/tianmoucv/blob/main/README.md"
+
 
 '''
 major.minor.patch.
@@ -50,7 +51,7 @@ setup(
                         'camera/lib/*']},
     include_package_data=True,
     install_requires=install_requires,
-    long_description="https://github.com/Tianmouc/tianmoucv/blob/main/README.md",
+    long_description=long_description,
     long_description_content_type="text/plain",
     # 可选的内容
     keywords='tianmoucv',           # 关键词
