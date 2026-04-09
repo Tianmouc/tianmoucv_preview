@@ -51,6 +51,7 @@ setup(
     include_package_data=True,
     install_requires=install_requires,
     long_description=long_description,
+    long_description_content_type = "text/markdown",
     # 可选的内容
     keywords='tianmoucv',           # 关键词
     classifiers=[
