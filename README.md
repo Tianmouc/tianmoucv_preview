@@ -13,8 +13,8 @@
 ## Introduction
 
 It is algorithms library for the first complementary vision sensor (CVS) Tianmouc.
-
-More details of the project can be found in [Tianmouc Sensor doc(need permission)](http://www.tianmouc.cn:30000) and [Tianmoucv Project Page](https://lyh983012.github.io//tianmoucv_doc_opensource/index.html)
+The APIs of algorithms and various tools can be found in [Tianmoucv Project Page](https://lyh983012.github.io//tianmoucv_doc_opensource/index.html)
+More details of the project can be found in [Tianmouc Sensor doc(need permission)](http://www.tianmouc.cn:30000) 
 
 ## Table of Contents
 
@@ -76,15 +76,14 @@ pip install tianmoucv
 (2) Install from source codes (recommened):
 
 ```bash
-git clone git@github.com:Tianmouc/tianmoucv.git
-cd tianmoucv
+git clone git@github.com:Tianmouc/tianmoucv_dev.git
+cd tianmoucv_dev
 sh install.sh
 ```
 
 For windows, please refer to the "install.bat", with the help of winGW
 
-You can download a TianMouC data clip in [THU-sharelink](http://www.tianmouc.cn:38328/index.php/s/HRoqBbmiSpfnY4G/download/fishe8.7z), and refer to tianmoucv/exmaple/data/test_data_read.ipynb for a trial
-
+**If you do not need to use the SDK, just press ENTER when inputing the SDK PATH**
 
 (3) Only update python codes (If you have already compile the lib manually), it will be helpful if you want to save your time modifying some python codes in TianmouCV.
 
@@ -94,7 +93,7 @@ sh update.sh
 
 ## Prepare your TMDAT files
 
-You can download a demo tianmouc data clip in [Tianmouc File Server](http://www.tianmouc.cn:38328/index.php/s/2ptYY27g3eRMydG), You can refer to the [tutorial](https://github.com/Tianmouc/tianmoucv/blob/master/tianmoucv_example/introduction_to_tianmouc_data.ipynb) for a trial.
+You can download a demo tianmouc data clip in [Tianmouc File Server](http://www.tianmouc.cn:38328/index.php/s/2ptYY27g3eRMydG), You can refer to the [tutorial](https://github.com/Tianmouc/tianmoucv_dev/blob/master/tianmoucv_example/introduction_to_tianmouc_data.ipynb) for a trial.
 
 A standard tianmouc data structure is like:
 
@@ -129,12 +128,21 @@ The examples are listed below
 ```
 ├── Tianmoucv example
 │   ├── introduction_to_tianmouc_data: Introduce how to read and visualize Tianmouc data.
+│   ├── >>>camera<<< connect to camera (SDK installation required).
+│   │   ├── open_camera: recieve and visualize Tianmouc data (tempate code)
+│   │   ├── qrcode_demo:  Decode QR code based on SD.
+│   │   ├── calibration_OpenCV: CameraCalib tool
+│   │   ├── deblur: (buggy) deblur rgb using tsd
+│   │   ├── realtime_inf: Realtime instance segmentation
 │   ├── >>>data<<<
 │   │   ├── covert_to_tmdat_and_calculate_bandwidth: Encode np array into the tmdat and calculate the bandwidth.
 │   │   ├── rotate_tsd: trick for rotate 2D vector filed -- SD
+│   │   ├── convert_pcie_bin_to_tmdat: tool for fpga dev version
 │   ├── >>>proc<<<
+│   │   ├── segmentation: dual pathway fusion instance segmentation
 │   │   ├── feature_tracking_gray_sd: feature tracking based only on SD
 │   │   ├── reconstructor:
+│   │   │   ├──reconstruct_fuse_net: best HDR-RGB vedio NN-based reconstructor
 │   │   │   ├──reconstruct_gray: Gray-scale image reconstruction based on SD
 │   │   │   ├──reconstruct_hdr_poisson_iter: simple HDR fusion method
 │   │   │   ├──reconstruct_original_nature_paper: RGB vedio NN-based reconstructor in original  Nature paper
@@ -144,8 +152,11 @@ The examples are listed below
 │   │   │   ├──opticalflow_HS_method: HS OF esitmator with TSD
 │   │   │   ├──opticalflow_LK_method: LK OF esitmator with TSD
 │   │   │   ├──opticalflow_spynet: NN-based OF estimator in original Nature paper
+│   │   │   ├──opticalflow_RAFT: best NN-based OF estimator
 │   │   ├── denoise:
 │   │   │   ├──denoise_tmdat_lvatf:denoise TSD using LVATF
+│   │   ├── deblur
+│   │   │   ├──deblur_stgdnet: deblur rgb using tsd
 │   ├── >>>imulator<<<
 │   │   │   ├──sim.ipynb: run simulator for rgb/td/sd sequence with vedio input
 ```
@@ -163,7 +174,7 @@ you can directly run it if all the prerequesite are installed
 ### Contributors
 
 This project exists thanks to all the people who contribute. 
-<a href="https://github.com/Tianmouc/tianmoucv/graphs/contributors"><img src="https://opencollective.com/tianmoucv/contributors.svg?width=890&button=false" /></a>
+<a href="https://github.com/Tianmouc/tianmoucv_dev/graphs/contributors"><img src="https://opencollective.com/tianmoucv/contributors.svg?width=890&button=false" /></a>
 
 Thanks to: Taoyi Wang, Yuguo Chen, Yapeng Meng, Yuxiang Li, Lin Yang
 

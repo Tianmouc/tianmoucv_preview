@@ -6,6 +6,8 @@ from .fusion import laplacian_blending,laplacian_blending_1c_batch,poisson_blend
 
 from .integration import TD_integration,SD_integration
 
+# from .fuse_net import TianmoucRecon_mem
+
 from .tiny_unet import TianmoucRecon_tiny
 
 from .recurrent import TianmoucRecon_recurrent

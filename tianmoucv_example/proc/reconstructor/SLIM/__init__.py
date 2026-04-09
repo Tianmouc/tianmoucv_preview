@@ -1,0 +1,1 @@
+"""Slim demo package root."""

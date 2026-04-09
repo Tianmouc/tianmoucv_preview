@@ -39,7 +39,7 @@ def limit_threads():
     import multiprocessing
     # 获取CPU核心数
     total_cores = multiprocessing.cpu_count()
-    desired_cores = min(max(1, total_cores // 4),32)
+    desired_cores = min(4,total_cores)
     # 设置环境变量
     os.environ['OMP_NUM_THREADS'] = str(desired_cores)
     os.environ['OPENBLAS_NUM_THREADS'] = str(desired_cores)
@@ -49,11 +49,10 @@ def limit_threads():
     # 设置PyTorch
     torch.set_num_threads(desired_cores)
 
-    print(f"试验功能:TianMouCV将限制单进程中opencv与pytorch默认的线程上限为CPU总核心数的1/4(<=32): {desired_cores}/{total_cores}")
-    print(f"如不想设置限制，请在环境变量中加入标记： DISABLE_TMCV_LIMIT_CORE ")
+    print(f"TianMouCV将限制单进程中opencv与pytorch默认的线程上限为CPU总核心数的1/4(并<=32): {desired_cores}/{total_cores}")
 
 # 调用函数
-print('TianMouCV™ version:',version('tianmoucv'),', via',__author__,' see DEVLOG.md')
+print('TianMouCV™ version:',version('tianmoucv'),', via',__author__,' see docs/DEVLOG.md')
 
 if 'DISABLE_TMCV_LIMIT_CORE' not in os.environ:
     limit_threads()

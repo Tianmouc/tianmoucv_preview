@@ -15,7 +15,7 @@ pandas
 seaborn
 pybind11
 requests
-torch
+torch>=1.10
 torchvision
 
 # Extras --------------------------------------

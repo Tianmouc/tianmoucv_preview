@@ -7,7 +7,7 @@ with open("./requirements.txt", "r", encoding="utf-8") as fh:
     install_requires = fh.read()
 
 with open("./README.md", "r", encoding="utf-8") as fh:
-    long_description = "TianmouCV is the official algorithm library of Tinamouc V1 (and soon will support Tianmouc V2..), including codec of the Tianmouc data (.tmdat files), deeplearning-friendly dataset reader, basic ISP tools, feature descriptions of TSD, classicle optical flow estimator and gray-sacle reconstructor, some basic but useful neural-network (reconstruction, opticla flow, deblur, instance segmentation and so on)."
+    long_description = fh.read()
 
 '''
 major.minor.patch.
@@ -36,11 +36,11 @@ except:
 
 setup(
     name='tianmoucv',                     # 模块的名称
-    version='0.4.0.2',                    # 版本号
-    author='Yihan Lin,Taoyi Wang',        # 作者名称
+    version='0.4.2.0',                    # 版本号 #带.1的是pub版本
+    author='Yihan Lin,Taoyi Wang,Yapeng Meng,Yuguo Chen',        # 作者名称
     author_email='532109881@qq.com',      # 作者邮箱
-    description='Algorithms library for Tianmouc sensor_preview version',   # 简要描述
-    url='https://github.com/Tianmouc/tianmoucv',  # 项目主页的URL
+    description='Algorithms library for Tianmouc sensor',   # 简要描述
+    url='https://github.com/Tianmouc/tianmoucv_dev',  # 项目主页的URL
     packages=find_packages(),   # 告诉 setuptools 自动找到要安装的包
     package_data = {'':['rdp_pcie/*',
                         'rdp_usb/*',
@@ -58,7 +58,6 @@ setup(
         'License :: OSI Approved :: MIT License',
         "Operating System :: OS Independent",
         'Intended Audience :: Developers',
-        
     ],
     python_requires='>=3.8'
 )
