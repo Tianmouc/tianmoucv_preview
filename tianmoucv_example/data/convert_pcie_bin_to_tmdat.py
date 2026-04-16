@@ -4,11 +4,7 @@ import struct
 import cv2,sys
 import torch
 
-try:
-    from tianmoucv.rdp_usb import rod_decoder_py as rdc
-except ImportError:
-    print("Warning: rod_decoder_py not found. Please compile it using compile_pybind.sh in tianmoucv/rdp_usb/")
-    rdc = None
+from tianmoucv.rdp_usb.rod_decode_pybind_usb import rod_decoder_py as rdc
 import time
 
 def check_and_create_folder(path):

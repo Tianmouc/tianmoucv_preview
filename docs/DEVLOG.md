@@ -79,3 +79,8 @@
 - TianmoucV1仿真器逻辑更新
 - **开始引入AI agent**使用AI对项目进行了优化重构和文档编写
 
+## 0.4.2.1 log @26.04.17
+
+- 增加光流算法SD-RAFT  tianmoucv_example/proc/optical_flow/opticalflow_RAFT.ipynb
+- 增加实例分割算法 tianmoucv_example/proc/feature_tracking_sd.ipynb
+- 增加IGFNet视频重建算法 tianmoucv_example/proc/reconstructor/reconstruct_fuse_net.ipynb

@@ -37,7 +37,7 @@ except:
 
 setup(
     name='tianmoucv',                     # 模块的名称
-    version='0.4.2.0',                    # 版本号 #带.1的是pub版本
+    version='0.4.2.1',                    # 版本号 #带.1的是pub版本
     author='Yihan Lin,Taoyi Wang,Yapeng Meng,Yuguo Chen',        # 作者名称
     author_email='532109881@qq.com',      # 作者邮箱
     description='Algorithms library for Tianmouc sensor',   # 简要描述

@@ -15,7 +15,7 @@ from tianmoucv.proc.reconstruct import laplacian_blending
 #start camera and read
 from tianmoucv.camera.sdk_utils import TMstreamingDataReader
 from tianmoucv.camera.sdk_utils import global_aop_queue,global_cop_queue,result_queue
-from tianmoucv.proc.deblur.STGDNet import TianmoucDeblurNet
+from tianmoucv.proc.deblur.STDNet import TianmoucDeblurNet
 from tianmoucv.proc.deblur.debluirDataBuilder import TianmouDeblurDataset
 from tianmoucv.data import TianmoucDataReader
 
