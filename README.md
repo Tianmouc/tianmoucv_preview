@@ -30,9 +30,9 @@ More details of the project can be found in [Tianmouc Sensor doc(need permission
 
 ## Background
 
-Tianmouc is the world's first multi-pathway brain-inspired vision sensor, which can simultaneously realize high-speed (10000 fps), high dynamics (130dB), high-sensitivity (72%@530nm, NIR), high accuracy (10bit RGB, 757 fps@8bit - 10,000fps@2bit), low power consumption, and low bandwidth (90% bandwidth reduction compared to traditional high-speed cameras) visual perception. It provides three different data modalities: Frame-based RGB, sparse Temproal Difference and sparse Spatial Differencs.
+Tianmouc is the world's first multi-pathway brain-inspired vision sensor, which can simultaneously realize high-speed (10000 fps), high dynamics (130dB), high-sensitivity (72%@530nm, NIR), high accuracy (10bit RGB, 757 fps@8bit - 10,000fps@2bit), low power consumption, and low bandwidth (90% bandwidth reduction compared to traditional high-speed cameras) visual perception. It provides three different data modalities: Frame-based RGB, sparse Temporal Difference and sparse Spatial Differences.
 
-TianmouCV is the official algorithm library of Tinamouc V1 (and soon will support Tianmouc V2..), including codec of the Tianmouc data (.tmdat files), deeplearning-friendly dataset reader, basic ISP tools, feature descriptions of TSD, classicle optical flow estimator and gray-sacle reconstructor, some basic but useful neural-network (reconstruction, opticla flow, deblur, instance segmentation and so on).
+TianmouCV is the official algorithm library of Tianmouc V1 (and soon will support Tianmouc V2..), including codec of the Tianmouc data (.tmdat files), deeplearning-friendly dataset reader, basic ISP tools, feature descriptions of TSD, classical optical flow estimator and gray-scale reconstructor, some basic but useful neural-network (reconstruction, optical flow, deblur, instance segmentation and so on).
 
 ## Installation
 
@@ -43,7 +43,7 @@ TianmouCV is the official algorithm library of Tinamouc V1 (and soon will suppor
 
 -install cmake, make, g++>9, build-essential
 
-- **specifiically**, for NVIDIA Jetson modules, you should install jetPack SDK, torch and torchvision.
+- **specifically**, for NVIDIA Jetson modules, you should install jetPack SDK, torch and torchvision.
 - Some blogs may be helpful:
     - [blog1](https://blog.csdn.net/weixin_44604409/article/details/132334866)
     - [blog2](https://zhuanlan.zhihu.com/p/437014069)
@@ -61,19 +61,19 @@ cd tianmouc_sdk/usb/install/cyusb_linux_1.0.5
 sh install
 ```
 
-and input the absolute path of tianmoucsdk when you install TianmouCV by excuting install.sh
+and input the absolute path of tianmoucsdk when you install TianmouCV by executing install.sh
 
 ### Compile and Install
 
 (1) from PyPI
 
-It will only install an early stready version of TianmouCV (0.3.5.0), for this dev version is still not published.
+It will only install an early steady version of TianmouCV (0.3.5.0), for this dev version is still not published.
 
 ```bash
 pip install tianmoucv
 ```
 
-(2) Install from source codes (recommened):
+(2) Install from source codes (recommended):
 
 ```bash
 git clone git@github.com:Tianmouc/tianmoucv_dev.git
@@ -113,12 +113,12 @@ The {matchkey} is the clip name used as a fileter key in Tianmouc data reader.
 
 ## Examples
 
-For some of the fuction we've provided the example in **tianmoucv_example**. 
+For some of the function we've provided the example in **tianmoucv_example**. 
 
 Most examples can be directly run on jupyter notebook, while some of them may need SDK support
 
 ```bash
-conda activate [your envirobnment]
+conda activate [your environment]
 pip install jupyter lab
 jupyter lab
 ```
@@ -129,7 +129,7 @@ The examples are listed below
 ├── Tianmoucv example
 │   ├── introduction_to_tianmouc_data: Introduce how to read and visualize Tianmouc data.
 │   ├── >>>camera<<< connect to camera (SDK installation required).
-│   │   ├── open_camera: recieve and visualize Tianmouc data (tempate code)
+│   │   ├── open_camera: receive and visualize Tianmouc data (template code)
 │   │   ├── qrcode_demo:  Decode QR code based on SD.
 │   │   ├── calibration_OpenCV: CameraCalib tool
 │   │   ├── deblur: (buggy) deblur rgb using tsd
@@ -142,29 +142,29 @@ The examples are listed below
 │   │   ├── segmentation: dual pathway fusion instance segmentation
 │   │   ├── feature_tracking_gray_sd: feature tracking based only on SD
 │   │   ├── reconstructor:
-│   │   │   ├──reconstruct_fuse_net: best HDR-RGB vedio NN-based reconstructor
+│   │   │   ├──reconstruct_fuse_net: best HDR-RGB video NN-based reconstructor
 │   │   │   ├──reconstruct_gray: Gray-scale image reconstruction based on SD
 │   │   │   ├──reconstruct_hdr_poisson_iter: simple HDR fusion method
-│   │   │   ├──reconstruct_original_nature_paper: RGB vedio NN-based reconstructor in original  Nature paper
+│   │   │   ├──reconstruct_original_nature_paper: RGB video NN-based reconstructor in original  Nature paper
 │   │   │   ├──reconstruct_recurrent: E2VID trained on TD
-│   │   │   ├──reconstruct_tiny_unet: fatest HDR-RGB vedio NN-based reconstructor
+│   │   │   ├──reconstruct_tiny_unet: fastest HDR-RGB video NN-based reconstructor
 │   │   ├── optical_flow:
-│   │   │   ├──opticalflow_HS_method: HS OF esitmator with TSD
-│   │   │   ├──opticalflow_LK_method: LK OF esitmator with TSD
+│   │   │   ├──opticalflow_HS_method: HS OF estimator with TSD
+│   │   │   ├──opticalflow_LK_method: LK OF estimator with TSD
 │   │   │   ├──opticalflow_spynet: NN-based OF estimator in original Nature paper
 │   │   │   ├──opticalflow_RAFT: best NN-based OF estimator
 │   │   ├── denoise:
 │   │   │   ├──denoise_tmdat_lvatf:denoise TSD using LVATF
 │   │   ├── deblur
 │   │   │   ├──deblur_stgdnet: deblur rgb using tsd
-│   ├── >>>imulator<<<
-│   │   │   ├──sim.ipynb: run simulator for rgb/td/sd sequence with vedio input
+│   ├── >>>simulator<<<
+│   │   │   ├──sim.ipynb: run simulator for rgb/td/sd sequence with video input
 ```
 
 
 We provide a example multi-thread realtime processing python script template in tianmoucv/camera/open_camera.py
 
-you can directly run it if all the prerequesite are installed
+you can directly run it if all the prerequisite are installed
 
 ## Maintainers
 
