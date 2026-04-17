@@ -7,7 +7,7 @@
 
 ---
 - **中文文档见** [ README_ZH.md](./docs/README_ZH.md)
-- **各版本开发日志见** [ DEVLOG.md](./docs/DEVLOG.md)
+- **Development Log(各版本开发日志) see** [ DEVLOG.md](./docs/DEVLOG.md)
 ---
 
 ## Introduction
@@ -30,7 +30,7 @@ More details of the project can be found in [Tianmouc Sensor doc(need permission
 
 ## Background
 
-Tianmouc is the world's first multi-pathway brain-inspired vision sensor, which can simultaneously realize high-speed (10000 fps), high dynamics (130dB), high-sensitivity (72%@530nm, NIR), high accuracy (10bit RGB, 757 fps@8bit - 10,000fps@2bit), low power consumption, and low bandwidth (90% bandwidth reduction compared to traditional high-speed cameras) visual perception. It provides three different data modalities: Frame-based RGB, sparse Temporal Difference and sparse Spatial Differences.
+Tianmouc is the world's first multi-pathway brain-inspired vision sensor, which can simultaneously realize high-speed (10000 fps), high dynamics (130 dB), high-sensitivity (72%@530nm, NIR), high accuracy (10bit RGB, 757 fps@8bit - 10,000fps@2bit), low power consumption, and low bandwidth (90% bandwidth reduction compared to traditional high-speed cameras) visual perception. It provides three different data modalities: Frame-based RGB, sparse Temporal Difference and sparse Spatial Differences.
 
 TianmouCV is the official algorithm library of Tianmouc V1 (and soon will support Tianmouc V2..), including codec of the Tianmouc data (.tmdat files), deeplearning-friendly dataset reader, basic ISP tools, feature descriptions of TSD, classical optical flow estimator and gray-scale reconstructor, some basic but useful neural-network (reconstruction, optical flow, deblur, instance segmentation and so on).
 
@@ -67,13 +67,11 @@ and input the absolute path of tianmoucsdk when you install TianmouCV by executi
 
 (1) from PyPI
 
-It will only install an early steady version of TianmouCV (0.3.5.0), for this dev version is still not published.
-
 ```bash
 pip install tianmoucv
 ```
 
-(2) Install from source codes (recommended):
+(2) Install from source codes:
 
 ```bash
 git clone git@github.com:Tianmouc/tianmoucv_dev.git
@@ -109,7 +107,15 @@ A standard tianmouc data structure is like:
 ```
 
 The {matchkey} is the clip name used as a fileter key in Tianmouc data reader.
- 
+
+
+## Tianmouc Research paper list and public resources
+
+- [TianmoucV1 Deblur (CVPR26)](https://tmcdeblur.github.io) [dataset](https://huggingface.co/datasets/mypThu/SportsSlomo-CVS)
+- [TianmoucV1 Generative High-speed Reconstruction (ICCV25)](https://github.com/Tianmouc/GenRec) [dataset](https://pan.baidu.com/share/init?surl=DFxXAAe0iVfPx-MPz2KVFQ&pwd=t6jw)
+- [Tianmouc self-supervised representation learnining](https://github.com/Tianmouc/TMC-SSL-Representation) [dataset (preparing)]()
+
+For more, see [Tianmoucv Group Page](https://github.com/Tianmouc)
 
 ## Examples
 
