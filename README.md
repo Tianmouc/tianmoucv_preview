@@ -14,7 +14,7 @@
 
 It is algorithms library for the first complementary vision sensor (CVS) Tianmouc.
 The APIs of algorithms and various tools can be found in [Tianmoucv Project Page](https://lyh983012.github.io//tianmoucv_doc_opensource/index.html)
-More details of the project can be found in [Tianmouc Sensor doc(need permission)](http://www.tianmouc.cn:30000) 
+More details of the project can be found in [Tianmouc Sensor doc](http://www.tianmouc.cn:30000) 
 
 ## Table of Contents
 
@@ -38,15 +38,9 @@ TianmouCV is the official algorithm library of Tianmouc V1 (and soon will suppor
 
 ### Environment Prepare
 
-
 (1) Unix
 
 -install cmake, make, g++>9, build-essential
-
-- **specifically**, for NVIDIA Jetson modules, you should install jetPack SDK, torch and torchvision.
-- Some blogs may be helpful:
-    - [blog1](https://blog.csdn.net/weixin_44604409/article/details/132334866)
-    - [blog2](https://zhuanlan.zhihu.com/p/437014069)
 
 (2) Windows
 
