@@ -107,7 +107,7 @@ The {matchkey} is the clip name used as a fileter key in Tianmouc data reader.
 
 - [TianmoucV1 Deblur (CVPR26)](https://tmcdeblur.github.io) [[dataset](https://huggingface.co/datasets/mypThu/SportsSlomo-CVS)]
 - [TianmoucV1 Generative High-speed Reconstruction (ICCV25)](https://github.com/Tianmouc/GenRec) [[dataset](https://pan.baidu.com/share/init?surl=DFxXAAe0iVfPx-MPz2KVFQ&pwd=t6jw)]
-- [Tianmouc self-supervised representation learnining](https://github.com/Tianmouc/TMC-SSL-Representation) [[dataset (preparing)]()]
+- [Tianmouc self-supervised representation learnining](https://github.com/Tianmouc/TMC-SSL-Representation) [[dataset](https://huggingface.co/datasets/ordinarabbit/Tianmouc-R)]
 
 For more, see [Tianmoucv Group Page](https://github.com/Tianmouc)
 
