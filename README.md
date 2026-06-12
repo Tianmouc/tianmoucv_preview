@@ -2,8 +2,7 @@
 
 ![PyPI - Version](https://img.shields.io/pypi/v/tianmoucv) ![PyPI - Wheel](https://img.shields.io/pypi/wheel/tianmoucv) ![PyPI - License](https://img.shields.io/pypi/l/tianmoucv) ![PyPI - Downloads](https://img.shields.io/pypi/dm/tianmoucv) 
 
-![usbmodule](/resources/usb_module.jpg)
-
+<img width="747" height="192" alt="未标题-1" src="https://github.com/user-attachments/assets/a92a4255-419f-4092-a461-037a9b4af027" />
 
 ---
 - **中文文档见** [ README_ZH.md](./docs/README_ZH.md)
