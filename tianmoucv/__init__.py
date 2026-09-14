@@ -34,22 +34,25 @@ except:
     from tianmoucv.rdp_usb import rod_decoder_py as rdc
     print('compile decoder successfully!')
     
-
 def limit_threads():
     import multiprocessing
     # 获取CPU核心数
     total_cores = multiprocessing.cpu_count()
-    desired_cores = min(4,total_cores)
+    desired_cores = 1
     # 设置环境变量
-    os.environ['OMP_NUM_THREADS'] = str(desired_cores)
-    os.environ['OPENBLAS_NUM_THREADS'] = str(desired_cores)
-    os.environ['MKL_NUM_THREADS'] = str(desired_cores)
+    os.environ.setdefault("OMP_NUM_THREADS", "1")
+    os.environ.setdefault("MKL_NUM_THREADS", "1")
+    os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+    os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
+    os.environ.setdefault("BLIS_NUM_THREADS", "1")
+    os.environ.setdefault("VECLIB_MAXIMUM_THREADS", "1")
+    os.environ.setdefault("OPENCV_NUM_THREADS", "0")
     # 设置OpenCV
     cv2.setNumThreads(desired_cores)
-    # 设置PyTorch
+    # 设置PyTorch4
     torch.set_num_threads(desired_cores)
 
-    print(f"TianMouCV将限制单进程中opencv与pytorch默认的线程上限为CPU总核心数的1/4(并<=32): {desired_cores}/{total_cores}")
+    print(f"[warning]TianMouCV限制进程内自动线程上限为1以便用于dataloader内，环境变量添加 DISABLE_TMCV_LIMIT_CORE 字符串可解除")
 
 # 调用函数
 print('TianMouCV™ version:',version('tianmoucv'),', via',__author__,' see docs/DEVLOG.md')

@@ -3,7 +3,10 @@ project("tianmoucv")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O2")
+option(TIANMOUCV_BUILD_EXAMPLE "Build the native camera preview executable" OFF)
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
 
@@ -89,6 +92,7 @@ else()
     
 
     include_directories("/usr/local/include/opencv4")
+    include_directories("/usr/include/libusb-1.0")
     find_package(OpenCV 4 REQUIRED)
     if(OpenCV_FOUND)
         message(STATUS "Found OpenCV version: ${OpenCV_VERSION}")
@@ -96,12 +100,14 @@ else()
         message(FATAL_ERROR "OpenCV version 4.5.0 or higher is required.")
     endif()
 
-    add_executable(tianmoucv_app ${file1} ${file2} ${file3} ${file4} ${file5} ${file6} ${file7})
-    target_link_libraries(tianmoucv_app PRIVATE ${OpenCV_LIBS} pthread cyusb -lusb-1.0)
+    if(TIANMOUCV_BUILD_EXAMPLE)
+        add_executable(tianmoucv_app ${file1} ${file2} ${file3} ${file4} ${file5} ${file6} ${file7})
+        target_compile_definitions(tianmoucv_app PRIVATE TIANMOUCV_BUILD_APP)
+        target_link_libraries(tianmoucv_app PRIVATE ${OpenCV_LIBS} pthread cyusb -lusb-1.0)
+    endif()
 
     add_library(tianmouc SHARED ${file1} ${file2} ${file3} ${file4} ${file5} ${file6} ${file7})
     target_link_libraries(tianmouc PRIVATE ${OpenCV_LIBS} cyusb pthread -lusb-1.0)
 
 
 endif()
-

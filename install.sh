@@ -12,4 +12,6 @@ echo "compile sdk lib..."
 cd tianmoucv/camera
 sh compile.sh
 cd ../..
-python -m pip install . -i https://pypi.tuna.tsinghua.edu.cn/simple
+echo "install requirements..."
+python -m pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+python -m pip install --no-deps . -i https://pypi.tuna.tsinghua.edu.cn/simple

@@ -41,11 +41,9 @@ class TianmoucOF_RAFT(nn.Module):
     计算稠密光流的nn方法
     默认权重存储于'weight/of_raft_ver_best.ckpt'
     或初始化时指定ckpt_path
-
     parameter:
         :param imgsize: (w,h),list
-        :param ckpt\_path: string, path to weight dictionary
-
+        :param ckpt_path: string, path to weight dictionary
     '''
     #temp network
     def __init__(self,ckpt_path = None, train= False,_optim=True):

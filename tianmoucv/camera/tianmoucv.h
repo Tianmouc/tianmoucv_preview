@@ -59,20 +59,25 @@ struct tianmoucData{
 
 uint64_t tmOpenCamera(int device_id =0);
 
-void tmStartTransfer(uint64_t cameraHandle);
+bool tmStartTransfer(uint64_t cameraHandle);
 
 bool tmGetFrame(uint64_t cameraHandle,tianmoucData* metadata);
 
-void tmCameraUninit(uint64_t cameraHandle);
+bool tmGetLatestFrame(uint64_t cameraHandle,tianmoucData* metadata);
 
-void tmExposureSet(uint64_t cameraHandle, int rodAEtime, int coneAEtime, int rodGainV=1, int coneGainV=1,int RODADCprecision = 8,int RODINTmode=1,int CONEINTmode=1);
+bool tmRenderRodPreview(uint64_t cameraHandle, uchar* output, int outputBytes);
+
+bool tmRenderConePreview(uint64_t cameraHandle, uchar* output, int outputBytes);
+
+bool tmCameraUninit(uint64_t cameraHandle);
+
+bool tmExposureSet(uint64_t cameraHandle, int rodAEtime, int coneAEtime, int rodGainV=1, int coneGainV=1,int RODADCprecision = 8,int RODINTmode=1,int CONEINTmode=1);
 
 /************************************
 void freeTianmoucData(tianmoucData* metadata);
 ************************************/
 
-void IICconfig_download(uint64_t cameraHandle, const char* IICconfigPath);
+bool IICconfig_download(uint64_t cameraHandle, const char* IICconfigPath);
 
 }
 #endif
-

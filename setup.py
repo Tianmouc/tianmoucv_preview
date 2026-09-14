@@ -17,7 +17,7 @@ major.minor.patch.
 PATCH 版本：在进行向后兼容的错误修复时递增。
 '''
 try:
-    if not ONLY_UPDATE_PYTHON in os.environ:
+    if "ONLY_UPDATE_PYTHON" not in os.environ:
         print("WARNING: no decoder found, try to auto compile")
         print('If you still get this message,please try:\n 1. run it in a python script (only once) \n 2. installfrom source code (install.sh) to see what happened')
         current_file_path = os.path.dirname(os.path.abspath(__file__))
@@ -37,7 +37,7 @@ except:
 
 setup(
     name='tianmoucv',                     # 模块的名称
-    version='0.4.2.1',                    # 版本号 #带.1的是pub版本
+    version='0.4.3.0',                # 版本号 #带.1的是pub版本
     author='Yihan Lin,Taoyi Wang,Yapeng Meng,Yuguo Chen',        # 作者名称
     author_email='532109881@qq.com',      # 作者邮箱
     description='Algorithms library for Tianmouc sensor',   # 简要描述

@@ -79,8 +79,16 @@
 - TianmoucV1仿真器逻辑更新
 - **开始引入AI agent**使用AI对项目进行了优化重构和文档编写
 
-## 0.4.2.1 log @26.04.17
+## 0.4.2.2 log @26.05.15
+- 增加了一个去噪网络，并支持去噪完转存
 
-- 增加光流算法SD-RAFT  tianmoucv_example/proc/optical_flow/opticalflow_RAFT.ipynb
-- 增加实例分割算法 tianmoucv/tianmoucv_example/proc/segmentation.ipynb
-- 增加IGFNet视频重建算法 tianmoucv_example/proc/reconstructor/reconstruct_fuse_net.ipynb
+## 0.4.2.3 log @26.05.25
+- 增加了一个多路径积分SD重建算法
+
+## 0.4.3.0 log @26.09.14
+
+- 更新 `tianmoucv.proc.denoise`：换用当前 DDDNet 推理网络和新权重，支持自动下载与缓存、连续样本的循环状态管理、真实 TianMouC 数据预处理，以及原始/去噪 TSD 的 3×2 对比视频导出。
+- 更新 `tianmoucv.proc.deblur`：换用当前 generalized STGDNet 推理网络和新权重，移除推理路径对 BasicSR、timm、einops、pandas 等额外包的依赖，并支持自动下载与缓存。
+- 去模糊接口增加曝光信息读取：使用正则兼容 `us`、`µs`、`ms` 等记录形式，按照样本 `C_idx` 读取曝光时间并结合 AOP 自动估计 blur length。
+- 更新 denoise/deblur 示例 notebook；denoise 使用 `outdoor_cross_6`，deblur 默认使用带 HS 标签且曝光记录完整的 `shake6` 实拍序列，并直接从 TianMouCV 公开接口完成推理，视频输出复用 `tianmoucv.utils.save_video` 的现有 MP4 写法。
+- 保留 `DualRecurrentDenoiserPT`、`TianmoucDeblurNet` 和旧输入/输出键作为兼容入口；未增加 TianMouCV 之外的新依赖。
